@@ -4,18 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
-
-	accdb "github.com/SkynetLabs/skynet-accounts/database"
-	"github.com/julienschmidt/httprouter"
 	"gitlab.com/NebulousLabs/errors"
-)
-
-var (
-	// ErrInvalidSkylink is returned when a client call supplies an invalid
-	// skylink hash.
-	ErrInvalidSkylink = errors.New("invalid skylink")
 )
 
 type (
@@ -38,6 +30,9 @@ func (api *API) healthGET(w http.ResponseWriter, req *http.Request, _ httprouter
 }
 
 // pinPOST informs pinner that a given skylink is pinned on the current server.
+// TODO either this method or the database one should convert the skylink to a
+//  canonical form (e.g. base64) before inserting it in the DB. This should be
+//  done throughout the project.
 func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var body SkylinkRequest
 	err := json.NewDecoder(req.Body).Decode(&body)
@@ -45,12 +40,14 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	if !accdb.ValidSkylinkHash(body.Skylink) {
-		api.WriteError(w, ErrInvalidSkylink, http.StatusBadRequest)
+	// Create the skylink.
+	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.ServerName)
+	if errors.Contains(err, database.ErrInvalidSkylink) {
+		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.ServerName)
-	if errors.Contains(err, database.ErrSkylinkExist) {
+	// If the skylink already exists, add this server to its list of servers.
+	if errors.Contains(err, database.ErrSkylinkExists) {
 		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, conf.ServerName)
 	}
 	if err != nil {

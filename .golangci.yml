@@ -53,7 +53,7 @@ linters-settings:
     check-shadowing: false
     disable-all: false
 
-  golint:
+  revive:
     min-confidence: 1.0
 
   gocritic:
@@ -86,7 +86,7 @@ linters:
   enable:
     - gocritic
     - gofmt
-    - golint
+    - revive
     - gosec
     - govet
     - misspell

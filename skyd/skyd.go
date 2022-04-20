@@ -1,8 +1,8 @@
 package skyd
 
 type (
-	// SkydClient allows us to call the local skyd instance.
-	SkydClient struct {
+	// Client allows us to call the local skyd instance.
+	Client struct {
 	}
 )
 

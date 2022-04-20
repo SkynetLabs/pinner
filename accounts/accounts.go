@@ -11,8 +11,8 @@ import (
 )
 
 type (
-	// AccountsClient allows us to talk to accounts service.
-	AccountsClient struct {
+	// Client allows us to talk to accounts service.
+	Client struct {
 		staticLogger *logrus.Logger
 	}
 )
@@ -21,7 +21,7 @@ type (
 // the resp argument and returns the status code and error of the request.
 // When the error doesn't come with a response code, we return one that makes
 // sense in the context of an HTTP request.
-func (ac AccountsClient) call(ctx context.Context, method string, endpoint string, resp interface{}) (int, error) {
+func (ac Client) call(ctx context.Context, method string, endpoint string, resp interface{}) (int, error) {
 	url := fmt.Sprintf("http://%s:%s%s", conf.AccountsHost, conf.AccountsPort, endpoint)
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {

@@ -15,7 +15,10 @@ all: release
 count = 1
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-pkgs = ./ ./api ./database
+pkgs = ./ ./accounts ./api ./database ./skyd
+
+# integration-pkgs defines the packages which contain integration tests
+integration-pkgs = ./test ./test/api ./test/database
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -34,23 +37,64 @@ markdown-spellcheck:
 	pip install codespell 1>/dev/null 2>&1
 	git ls-files "*.md" :\!:"vendor/**" | xargs codespell --check-filenames
 
-# lint runs golangci-lint (which includes golint, a spellcheck of the codebase,
+# lint runs golangci-lint (which includes revive, a spellcheck of the codebase,
 # and other linters), the custom analyzers, and also a markdown spellchecker.
 lint: fmt markdown-spellcheck vet
-	golint ./...
 	golangci-lint run -c .golangci.yml
 	go mod tidy
 	analyze -lockcheck -- $(pkgs)
 
-# lint-ci runs golint.
+# lint-ci runs revive.
 lint-ci:
-# golint is skipped on Windows.
+# revive is skipped on Windows.
 ifneq ("$(OS)","Windows_NT")
 # Linux
-	go get -d golang.org/x/lint/golint
-	golint -min_confidence=1.0 -set_exit_status $(pkgs)
+	go install github.com/mgechev/revive@latest
+	revive -set_exit_status $(pkgs)
 	go mod tidy
 endif
+
+# Credentials and port we are going to use for our test MongoDB instance.
+MONGO_USER=admin
+MONGO_PASSWORD=aO4tV5tC1oU3oQ7u
+MONGO_PORT=17018
+
+# call_mongo is a helper function that executes a query in an `eval` call to the
+# test mongo instance.
+define call_mongo
+    docker exec pinner-mongo-test-db mongo -u $(MONGO_USER) -p $(MONGO_PASSWORD) --port $(MONGO_PORT) --eval $(1)
+endef
+
+# start-mongo starts a local mongoDB container with no persistence.
+# We first prepare for the start of the container by making sure the test
+# keyfile has the right permissions, then we clear any potential leftover
+# containers with the same name. After we start the container we initialise a
+# single node replica set. All the output is discarded because it's noisy and
+# if it causes a failure we'll immediately know where it is even without it.
+start-mongo:
+	-docker stop pinner-mongo-test-db 1>/dev/null 2>&1
+	-docker rm pinner-mongo-test-db 1>/dev/null 2>&1
+	chmod 400 $(shell pwd)/test/fixtures/mongo_keyfile
+	docker run \
+     --rm \
+     --detach \
+     --name pinner-mongo-test-db \
+     -p $(MONGO_PORT):$(MONGO_PORT) \
+     -e MONGO_INITDB_ROOT_USERNAME=$(MONGO_USER) \
+     -e MONGO_INITDB_ROOT_PASSWORD=$(MONGO_PASSWORD) \
+     -v $(shell pwd)/test/fixtures/mongo_keyfile:/data/mgkey \
+	mongo:4.4.1 mongod --port=$(MONGO_PORT) --replSet=skynet --keyFile=/data/mgkey 1>/dev/null 2>&1
+	# wait for mongo to start before we try to configure it
+	status=1 ; while [[ $$status -gt 0 ]]; do \
+		sleep 1 ; \
+		$(call call_mongo,"") 1>/dev/null 2>&1 ; \
+		status=$$? ; \
+	done
+	# Initialise a single node replica set.
+	$(call call_mongo,"rs.initiate({_id: \"skynet\", members: [{ _id: 0, host: \"localhost:$(MONGO_PORT)\" }]})") 1>/dev/null 2>&1
+
+stop-mongo:
+	-docker stop pinner-mongo-test-db
 
 # debug builds and installs debug binaries. This will also install the utils.
 debug:
@@ -85,9 +129,14 @@ test:
 
 test-long: lint lint-ci
 	@mkdir -p cover
-	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=30s $(pkgs) -run=. -count=$(count)
+	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=60s $(pkgs) -run=$(run) -count=$(count)
+
+# These env var values are for testing only. They can be freely changed.
+test-int: test-long start-mongo
+	GORACE='$(racevars)' go test -race -v -tags='testing debug netgo' -timeout=600s $(integration-pkgs) -run=$(run) -count=$(count)
+	-make stop-mongo
 
 run-dev:
 	go run -tags="dev" .
 
-.PHONY: all fmt install release check test test-long run-dev
+.PHONY: all fmt install release check test test-int test-long start-mongo stop-mongo run-dev

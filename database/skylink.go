@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 
+	accdb "github.com/SkynetLabs/skynet-accounts/database"
 	"gitlab.com/NebulousLabs/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,9 +12,12 @@ import (
 )
 
 var (
+	// ErrInvalidSkylink is returned when a client call supplies an invalid
+	// skylink hash.
+	ErrInvalidSkylink = errors.New("invalid skylink")
 	// ErrSkylinkExists is returned when we try to create a skylink that already
 	// exists.
-	ErrSkylinkExist = errors.New("skylink already exists")
+	ErrSkylinkExists = errors.New("skylink already exists")
 	// ErrSkylinkNoExist is returned when we try to get a skylink that doesn't
 	// exist.
 	ErrSkylinkNoExist = errors.New("skylink does not exist")
@@ -31,6 +35,9 @@ type (
 // SkylinkCreate inserts a new skylink into the DB. Returns an error if it
 // already exists.
 func (db *DB) SkylinkCreate(ctx context.Context, sl string, server string) (Skylink, error) {
+	if !accdb.ValidSkylinkHash(sl) {
+		return Skylink{}, ErrInvalidSkylink
+	}
 	servers := []string{}
 	if server != "" {
 		servers = append(servers, server)
@@ -41,7 +48,7 @@ func (db *DB) SkylinkCreate(ctx context.Context, sl string, server string) (Skyl
 	}
 	ir, err := db.staticDB.Collection(collSkylinks).InsertOne(ctx, s)
 	if mongo.IsDuplicateKeyError(err) {
-		return Skylink{}, ErrSkylinkExist
+		return Skylink{}, ErrSkylinkExists
 	}
 	if err != nil {
 		return Skylink{}, err
@@ -50,7 +57,7 @@ func (db *DB) SkylinkCreate(ctx context.Context, sl string, server string) (Skyl
 	return s, nil
 }
 
-// Skylink gets a skylink from the DB.
+// SkylinkFetch fetches a skylink from the DB.
 func (db *DB) SkylinkFetch(ctx context.Context, sl string) (Skylink, error) {
 	sr := db.staticDB.Collection(collSkylinks).FindOne(ctx, bson.M{"skylink": sl})
 	if sr.Err() == mongo.ErrNoDocuments {
@@ -79,10 +86,10 @@ func (db *DB) SkylinkServerAdd(ctx context.Context, sl string, server string) er
 	return err
 }
 
-// SkylinkServerRemoveremoves a server to the list of servers known to be
+// SkylinkServerRemove removes a server to the list of servers known to be
 // pinning this skylink. If the skylink does not exist in the database it will
 // not be inserted.
-func (db *DB) SkylinkServerRemove(ctx context.Context, sl Skylink, server string) error {
+func (db *DB) SkylinkServerRemove(ctx context.Context, sl string, server string) error {
 	filter := bson.M{
 		"skylink": sl,
 		"servers": server,
