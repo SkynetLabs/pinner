@@ -1,10 +1,21 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
+	"github.com/skynetlabs/pinner/conf"
+	"github.com/skynetlabs/pinner/database"
+
+	accdb "github.com/SkynetLabs/skynet-accounts/database"
 	"github.com/julienschmidt/httprouter"
 	"gitlab.com/NebulousLabs/errors"
+)
+
+var (
+	// ErrInvalidSkylink is returned when a client call supplies an invalid
+	// skylink hash.
+	ErrInvalidSkylink = errors.New("invalid skylink")
 )
 
 type (
@@ -27,11 +38,40 @@ func (api *API) healthGET(w http.ResponseWriter, req *http.Request, _ httprouter
 }
 
 // pinPOST informs pinner that a given skylink is pinned on the current server.
-func (api *API) pinPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
+func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var body SkylinkRequest
+	err := json.NewDecoder(req.Body).Decode(&body)
+	if err != nil {
+		api.WriteError(w, err, http.StatusBadRequest)
+		return
+	}
+	if !accdb.ValidSkylinkHash(body.Skylink) {
+		api.WriteError(w, ErrInvalidSkylink, http.StatusBadRequest)
+		return
+	}
+	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.ServerName)
+	if errors.Contains(err, database.ErrSkylinkExist) {
+		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, conf.ServerName)
+	}
+	if err != nil {
+		api.WriteError(w, err, http.StatusInternalServerError)
+		return
+	}
+	api.WriteSuccess(w)
 }
 
-// unpinPOST informs pinner that a given skylink is pinned on the current server.
+// unpinPOST informs pinner that a given skylink should no longer be pinned by
+// any server.
+/*
+TODO
+ - Mark the skylink for unpinning.
+ - Unpin the skylink from the local server and remove the server from the list.
+ - Keep the skylink in the DB with the unpinning flag up. This will ensure that
+ if the skylink is still pinned to any server and we sweep that sever and add
+ the skylink to the DB, it will be immediately scheduled for unpinning and it
+ will be removed from that server.
+ - Change the /ping endpoint to check for this flag and remove it, if raised.
+*/
 func (api *API) unpinPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
 }

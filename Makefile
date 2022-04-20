@@ -87,4 +87,7 @@ test-long: lint lint-ci
 	@mkdir -p cover
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=30s $(pkgs) -run=. -count=$(count)
 
-.PHONY: all fmt install release check test test-long
+run-dev:
+	go run -tags="dev" .
+
+.PHONY: all fmt install release check test test-long run-dev
