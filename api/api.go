@@ -7,9 +7,9 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
-	"github.com/skynetlabs/pinner/build"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/build"
 )
 
 type (

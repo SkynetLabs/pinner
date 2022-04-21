@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/skynetlabs/pinner/database"
-
 	"gitlab.com/NebulousLabs/fastrand"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 	"go.sia.tech/siad/crypto"

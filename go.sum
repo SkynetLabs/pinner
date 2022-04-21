@@ -533,8 +533,9 @@ gitlab.com/NebulousLabs/threadgroup v0.0.0-20200527092543-afa01960408c/go.mod h1
 gitlab.com/NebulousLabs/threadgroup v0.0.0-20200608151952-38921fbef213 h1:owERlKtUEFTPQ897iiqWPOuWBdq7BYqPxDOCgEZnbN4=
 gitlab.com/NebulousLabs/threadgroup v0.0.0-20200608151952-38921fbef213/go.mod h1:vIutAvl7lmJqLVYTCBY5WDdJomP+V74At8LCeEYoH8w=
 gitlab.com/NebulousLabs/writeaheadlog v0.0.0-20200618142844-c59a90f49130/go.mod h1:SxigdS5Q1ui+OMgGAXt1E/Fg3RB6PvKXMov2O3gvIzs=
-gitlab.com/SkynetLabs/skyd v1.5.9 h1:b2e3pV9YDkeV5bZdmLtsl/OOGjMuGIJF2AwLKyKaG1E=
 gitlab.com/SkynetLabs/skyd v1.5.9/go.mod h1:QeQgnpLH3ZLxTQqLroKJw8H7dO/Ibsl3GPgmR7qM9/c=
+gitlab.com/SkynetLabs/skyd v1.5.10 h1:T08/of+afJwXC3Dt+K2NmQdkYOfGxzlmtNcpsd7lae0=
+gitlab.com/SkynetLabs/skyd v1.5.10/go.mod h1:jJdPz8vA9kymTEvQP3thUFXNKC9hZPjhPQBN5KjWGCk=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.mongodb.org/mongo-driver v1.4.2/go.mod h1:WcMNYLx/IlOxLe6JRJiv2uXuCz6zBLndR4SoGjYphSc=
 go.mongodb.org/mongo-driver v1.8.3 h1:TDKlTkGDKm9kkJVUOAXDK5/fkqKHJVwYQSpoRfB43R4=

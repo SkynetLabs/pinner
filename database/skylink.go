@@ -38,13 +38,12 @@ func (db *DB) SkylinkCreate(ctx context.Context, sl string, server string) (Skyl
 	if !accdb.ValidSkylinkHash(sl) {
 		return Skylink{}, ErrInvalidSkylink
 	}
-	servers := []string{}
-	if server != "" {
-		servers = append(servers, server)
+	if server == "" {
+		return Skylink{}, errors.New("invalid server name")
 	}
 	s := Skylink{
 		Skylink: sl,
-		Servers: servers,
+		Servers: []string{server},
 	}
 	ir, err := db.staticDB.Collection(collSkylinks).InsertOne(ctx, s)
 	if mongo.IsDuplicateKeyError(err) {

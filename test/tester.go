@@ -14,7 +14,7 @@ import (
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
-	"go.sia.tech/siad/build"
+	"gitlab.com/SkynetLabs/skyd/build"
 )
 
 var (

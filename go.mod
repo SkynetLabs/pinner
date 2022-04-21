@@ -9,7 +9,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	gitlab.com/NebulousLabs/errors v0.0.0-20200929122200-06c536cf6975
 	gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40
-	gitlab.com/SkynetLabs/skyd v1.5.9
+	gitlab.com/SkynetLabs/skyd v1.5.10
 	go.mongodb.org/mongo-driver v1.8.3
 	go.sia.tech/siad v1.5.7
 )
