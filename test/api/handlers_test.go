@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/test"
 	"gitlab.com/NebulousLabs/errors"
@@ -18,6 +19,15 @@ type subtest struct {
 // TestHandlers is a meta test that sets up a test instance of pinner and runs
 // a suite of tests that ensure all handlers behave as expected.
 func TestHandlers(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	if conf.ServerName == "" {
+		conf.ServerName = test.TestServerName
+	}
+
 	dbName := test.DBNameForTest(t.Name())
 	at, err := test.NewTester(dbName)
 	if err != nil {

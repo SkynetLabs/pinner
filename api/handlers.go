@@ -42,7 +42,7 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 	var sl skymodules.Skylink
 	err = sl.LoadString(body.Skylink)
 	if err != nil {
-		api.WriteError(w, err, http.StatusBadRequest)
+		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
 		return
 	}
 	// Create the skylink.
