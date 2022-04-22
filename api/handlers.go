@@ -8,6 +8,7 @@ import (
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -30,9 +31,6 @@ func (api *API) healthGET(w http.ResponseWriter, req *http.Request, _ httprouter
 }
 
 // pinPOST informs pinner that a given skylink is pinned on the current server.
-// TODO either this method or the database one should convert the skylink to a
-//  canonical form (e.g. base64) before inserting it in the DB. This should be
-//  done throughout the project.
 func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var body SkylinkRequest
 	err := json.NewDecoder(req.Body).Decode(&body)
@@ -40,8 +38,15 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
+	// Validate the skylink.
+	var sl skymodules.Skylink
+	err = sl.LoadString(body.Skylink)
+	if err != nil {
+		api.WriteError(w, err, http.StatusBadRequest)
+		return
+	}
 	// Create the skylink.
-	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.ServerName)
+	_, err = api.staticDB.SkylinkCreate(req.Context(), sl.String(), conf.ServerName)
 	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
