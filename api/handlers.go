@@ -74,7 +74,21 @@ TODO
  will be removed from that server.
  - Change the /ping endpoint to check for this flag and remove it, if raised.
 */
-func (api *API) unpinPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var body SkylinkRequest
+	err := json.NewDecoder(req.Body).Decode(&body)
+	if err != nil {
+		api.WriteError(w, err, http.StatusBadRequest)
+		return
+	}
+	// Validate the skylink.
+	var sl skymodules.Skylink
+	err = sl.LoadString(body.Skylink)
+	if err != nil {
+		api.WriteError(w, err, http.StatusBadRequest)
+		return
+	}
+
 	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
 }
 

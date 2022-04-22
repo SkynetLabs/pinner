@@ -25,6 +25,12 @@ var (
 	// ServerName holds the name of the current server. This name will be used
 	// for identifying which servers are pinning a given skylink.
 	ServerName string
+	// SiaAPIPassword is the apipassword for the local skyd
+	SiaAPIPassword string
+	// SiaAPIHost is the hostname/IP of the local skyd
+	SiaAPIHost = "10.10.10.10"
+	// SiaAPIPort is the port of the local skyd
+	SiaAPIPort = "9980"
 )
 
 // LoadConfiguration loads the required service configuration from the
@@ -53,6 +59,9 @@ func LoadConfiguration() error {
 	if DBPort, ok = os.LookupEnv("SKYNET_DB_PORT"); !ok {
 		return errors.New("missing env var SKYNET_DB_PORT")
 	}
+	if SiaAPIPassword, ok = os.LookupEnv("SIA_API_PASSWORD"); !ok {
+		return errors.New("missing env var SIA_API_PASSWORD")
+	}
 
 	// Optional
 	if val, ok = os.LookupEnv("SKYNET_ACCOUNTS_HOST"); ok {
@@ -63,6 +72,12 @@ func LoadConfiguration() error {
 	}
 	if val, ok = os.LookupEnv("PINNER_LOG_LEVEL"); ok {
 		LogLevel = val
+	}
+	if val, ok = os.LookupEnv("API_HOST"); ok {
+		SiaAPIHost = val
+	}
+	if val, ok = os.LookupEnv("API_PORT"); ok {
+		SiaAPIPort = val
 	}
 
 	return nil
