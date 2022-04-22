@@ -47,5 +47,17 @@ func main() {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
 
+	// TODO Start a background loop that would scan the DB for either unpinned
+	// 	or underpinned skylinks and pins/unpins them.
+
+	/*
+		TODO
+		 - Unpin the skylink from the local server and remove the server from the list.
+		 - Keep the skylink in the DB with the unpinning flag up. This will ensure that
+		 if the skylink is still pinned to any server and we sweep that sever and add
+		 the skylink to the DB, it will be immediately scheduled for unpinning and it
+		 will be removed from that server.
+	*/
+
 	log.Fatal(server.ListenAndServe(4000))
 }

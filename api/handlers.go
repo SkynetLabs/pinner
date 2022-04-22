@@ -81,16 +81,6 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 
 // unpinPOST informs pinner that a given skylink should no longer be pinned by
 // any server.
-/*
-TODO
- - Mark the skylink for unpinning.
- - Unpin the skylink from the local server and remove the server from the list.
- - Keep the skylink in the DB with the unpinning flag up. This will ensure that
- if the skylink is still pinned to any server and we sweep that sever and add
- the skylink to the DB, it will be immediately scheduled for unpinning and it
- will be removed from that server.
- - Change the /ping endpoint to check for this flag and remove it, if raised.
-*/
 func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var body SkylinkRequest
 	err := json.NewDecoder(req.Body).Decode(&body)
@@ -102,13 +92,15 @@ func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter
 	var sl skymodules.Skylink
 	err = sl.LoadString(body.Skylink)
 	if err != nil {
-		api.WriteError(w, err, http.StatusBadRequest)
+		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
 		return
 	}
-
-	// TODO Implement.
-
-	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
+	err = api.staticDB.SkylinkMarkUnpinned(req.Context(), sl.String())
+	if err != nil {
+		api.WriteError(w, err, http.StatusInternalServerError)
+		return
+	}
+	api.WriteSuccess(w)
 }
 
 // sweepPOST instructs pinner to scan the list of skylinks pinned by skyd and

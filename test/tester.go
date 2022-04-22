@@ -259,3 +259,16 @@ func (at *Tester) PinPOST(sl string) (int, error) {
 	r, err := at.Request(http.MethodPost, "/pin", nil, body, nil, nil)
 	return r.StatusCode, err
 }
+
+// UnpinPOST tells pinner that no users are pinning this skylink and it should
+// be unpinned by all servers.
+func (at *Tester) UnpinPOST(sl string) (int, error) {
+	body, err := json.Marshal(api.SkylinkRequest{
+		Skylink: sl,
+	})
+	if err != nil {
+		return http.StatusBadRequest, errors.AddContext(err, "unable to marshal request body")
+	}
+	r, err := at.Request(http.MethodPost, "/unpin", nil, body, nil, nil)
+	return r.StatusCode, err
+}

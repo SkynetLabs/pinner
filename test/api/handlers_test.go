@@ -43,6 +43,7 @@ func TestHandlers(t *testing.T) {
 	tests := []subtest{
 		{name: "Health", test: testHandlerHealthGET},
 		{name: "Pin", test: testHandlerPinPOST},
+		{name: "Unpin", test: testHandlerUnpinPOST},
 	}
 
 	// Run subtests
@@ -97,5 +98,34 @@ func testHandlerPinPOST(t *testing.T, at *test.Tester) {
 	}
 	if slNew.Unpin {
 		t.Fatal("Expected the skylink to no longer be marked as unpinned.")
+	}
+}
+
+// testHandlerUnpinPOST tests "POST /unpin"
+func testHandlerUnpinPOST(t *testing.T, at *test.Tester) {
+	sl := test.RandomSkylink()
+
+	// Unpin an invalid skylink.
+	_, err := at.UnpinPOST("this is not a skylink")
+	if err == nil || !strings.Contains(err.Error(), database.ErrInvalidSkylink.Error()) {
+		t.Fatalf("Expected error '%s', got '%v'", database.ErrInvalidSkylink, err)
+	}
+	// Pin a valid skylink.
+	status, err := at.PinPOST(sl)
+	if err != nil || status != http.StatusNoContent {
+		t.Fatal(status, err)
+	}
+	// Unpin the skylink.
+	status, err = at.UnpinPOST(sl)
+	if err != nil || status != http.StatusNoContent {
+		t.Fatal(status, err)
+	}
+	// Make sure the skylink is marked as unpinned.
+	slNew, err := at.DB.SkylinkFetch(at.Ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slNew.Unpin {
+		t.Fatal("Expected the skylink to be marked as unpinned.")
 	}
 }
