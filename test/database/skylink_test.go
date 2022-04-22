@@ -55,8 +55,6 @@ func TestSkylink(t *testing.T) {
 	if !errors.Contains(err, database.ErrSkylinkExists) {
 		t.Fatalf("Expected '%s', got '%v'", database.ErrSkylinkExists, err)
 	}
-	// TODO Add the same skylink again, this time in base32. Make sure it doesn't get duplicated.
-
 	// Add a new server to the list.
 	server := "new server"
 	err = db.SkylinkServerAdd(ctx, sl, server)
@@ -83,5 +81,29 @@ func TestSkylink(t *testing.T) {
 	// Make sure the new server was added to the list.
 	if len(s.Servers) != 1 || s.Servers[0] != conf.ServerName {
 		t.Fatalf("Expected to find only '%s' in the list, got '%v'", conf.ServerName, s.Servers)
+	}
+	// Mark the file as unpinned.
+	err = db.SkylinkMarkUnpinned(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = db.SkylinkFetch(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.Unpin {
+		t.Fatal("Expected the skylink to be unpinned.")
+	}
+	// Mark the file as pinned again.
+	err = db.SkylinkMarkPinned(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = db.SkylinkFetch(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Unpin {
+		t.Fatal("Expected the skylink to not be unpinned.")
 	}
 }

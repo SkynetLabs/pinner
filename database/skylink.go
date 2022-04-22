@@ -25,10 +25,13 @@ var (
 
 type (
 	// Skylink represents a skylink object in the DB.
+	// The Unpin field instructs all servers, currently pinning this skylink,
+	// that there are no users pinning and the servers should unpin it as well.
 	Skylink struct {
 		ID      primitive.ObjectID `bson:"_id,omitempty"`
 		Skylink string             `bson:"skylink"`
 		Servers []string           `bson:"servers"`
+		Unpin   bool               `bson:"unpin"`
 	}
 )
 
@@ -71,6 +74,24 @@ func (db *DB) SkylinkFetch(ctx context.Context, sl string) (Skylink, error) {
 		return Skylink{}, err
 	}
 	return s, nil
+}
+
+// SkylinkMarkPinned marks a skylink as pinned (or no longer unpinned), meaning
+// that Pinner should make sure it's pinned by the minimum number of servers.
+func (db *DB) SkylinkMarkPinned(ctx context.Context, sl string) error {
+	filter := bson.M{"skylink": sl}
+	update := bson.M{"$set": bson.M{"unpin": false}}
+	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	return err
+}
+
+// SkylinkMarkUnpinned marks a skylink as unpinned, meaning that all servers
+// should stop pinning it.
+func (db *DB) SkylinkMarkUnpinned(ctx context.Context, sl string) error {
+	filter := bson.M{"skylink": sl}
+	update := bson.M{"$set": bson.M{"unpin": true}}
+	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	return err
 }
 
 // SkylinkServerAdd adds a new server to the list of servers known to be pinning

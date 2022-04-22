@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/test"
 	"gitlab.com/NebulousLabs/errors"
@@ -18,6 +19,15 @@ type subtest struct {
 // TestHandlers is a meta test that sets up a test instance of pinner and runs
 // a suite of tests that ensure all handlers behave as expected.
 func TestHandlers(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	if conf.ServerName == "" {
+		conf.ServerName = test.TestServerName
+	}
+
 	dbName := test.DBNameForTest(t.Name())
 	at, err := test.NewTester(dbName)
 	if err != nil {
@@ -69,5 +79,23 @@ func testHandlerPinPOST(t *testing.T, at *test.Tester) {
 	status, err := at.PinPOST(sl)
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
+	}
+
+	// Mark the skylink as unpinned and pin it again.
+	// Expect it to no longer be unpinned.
+	err = at.DB.SkylinkMarkUnpinned(at.Ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err = at.PinPOST(sl)
+	if err != nil || status != http.StatusNoContent {
+		t.Fatal(status, err)
+	}
+	slNew, err := at.DB.SkylinkFetch(at.Ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slNew.Unpin {
+		t.Fatal("Expected the skylink to no longer be marked as unpinned.")
 	}
 }
