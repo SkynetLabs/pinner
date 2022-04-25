@@ -128,4 +128,18 @@ func testHandlerUnpinPOST(t *testing.T, at *test.Tester) {
 	if !slNew.Unpin {
 		t.Fatal("Expected the skylink to be marked as unpinned.")
 	}
+	// Unpin a valid skylink that's not in the DB, yet.
+	sl2 := test.RandomSkylink()
+	status, err = at.UnpinPOST(sl2)
+	if err != nil || status != http.StatusNoContent {
+		t.Fatal(status, err)
+	}
+	// Make sure the skylink is marked as unpinned.
+	sl2New, err := at.DB.SkylinkFetch(at.Ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sl2New.Unpin {
+		t.Fatal("Expected the skylink to be marked as unpinned.")
+	}
 }

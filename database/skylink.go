@@ -81,6 +81,8 @@ func (db *DB) SkylinkFetch(ctx context.Context, sl string) (Skylink, error) {
 func (db *DB) SkylinkMarkPinned(ctx context.Context, sl string) error {
 	filter := bson.M{"skylink": sl}
 	update := bson.M{"$set": bson.M{"unpin": false}}
+	opts := options.UpdateOptions{}
+	opts.SetUpsert(true)
 	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
 	return err
 }
@@ -90,6 +92,8 @@ func (db *DB) SkylinkMarkPinned(ctx context.Context, sl string) error {
 func (db *DB) SkylinkMarkUnpinned(ctx context.Context, sl string) error {
 	filter := bson.M{"skylink": sl}
 	update := bson.M{"$set": bson.M{"unpin": true}}
+	opts := options.UpdateOptions{}
+	opts.SetUpsert(true)
 	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
 	return err
 }
