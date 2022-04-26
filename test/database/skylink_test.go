@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/skynetlabs/pinner/conf"
@@ -18,8 +19,15 @@ func TestSkylink(t *testing.T) {
 	}
 	t.Parallel()
 
-	if conf.ServerName == "" {
-		conf.ServerName = test.TestServerName
+	if conf.Conf().ServerName == "" {
+		err := os.Setenv("SERVER_DOMAIN", test.TestServerName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = conf.LoadConf()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	ctx := context.Background()
@@ -37,12 +45,12 @@ func TestSkylink(t *testing.T) {
 		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNoExist, err)
 	}
 	// Try to create an invalid skylink.
-	_, err = db.SkylinkCreate(ctx, "this is not a valid skylink", conf.ServerName)
+	_, err = db.SkylinkCreate(ctx, "this is not a valid skylink", conf.Conf().ServerName)
 	if err == nil {
 		t.Fatal("Managed to create an invalid skylink.")
 	}
 	// Create the skylink.
-	s, err := db.SkylinkCreate(ctx, sl, conf.ServerName)
+	s, err := db.SkylinkCreate(ctx, sl, conf.Conf().ServerName)
 	if err != nil {
 		t.Fatal("Failed to create a skylink:", err)
 	}
@@ -51,7 +59,7 @@ func TestSkylink(t *testing.T) {
 		t.Fatalf("Expected skylink '%s', got '%s'", sl, s.Skylink)
 	}
 	// Add the skylink again, expect ErrSkylinkExists.
-	_, err = db.SkylinkCreate(ctx, sl, conf.ServerName)
+	_, err = db.SkylinkCreate(ctx, sl, conf.Conf().ServerName)
 	if !errors.Contains(err, database.ErrSkylinkExists) {
 		t.Fatalf("Expected '%s', got '%v'", database.ErrSkylinkExists, err)
 	}
@@ -81,7 +89,7 @@ func TestSkylink(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Make sure the new server was added to the list.
-	if len(s.Servers) != 1 || s.Servers[0] != conf.ServerName {
-		t.Fatalf("Expected to find only '%s' in the list, got '%v'", conf.ServerName, s.Servers)
+	if len(s.Servers) != 1 || s.Servers[0] != conf.Conf().ServerName {
+		t.Fatalf("Expected to find only '%s' in the list, got '%v'", conf.Conf().ServerName, s.Servers)
 	}
 }

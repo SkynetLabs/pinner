@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -25,8 +26,15 @@ func TestHandlers(t *testing.T) {
 	}
 	t.Parallel()
 
-	if conf.ServerName == "" {
-		conf.ServerName = test.TestServerName
+	if conf.Conf().ServerName == "" {
+		err := os.Setenv("SERVER_DOMAIN", test.TestServerName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = conf.LoadConf()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	dbName := test.DBNameForTest(t.Name())

@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// Load the configuration from the environment and the local .env file.
-	err := conf.LoadConfiguration()
+	err := conf.LoadConf()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,7 +23,7 @@ func main() {
 	// wind themselves down.
 	ctx := context.Background()
 	logger := logrus.New()
-	logLevel, err := logrus.ParseLevel(conf.LogLevel)
+	logLevel, err := logrus.ParseLevel(conf.Conf().LogLevel)
 	if err != nil {
 		logLevel = logrus.InfoLevel
 	}
@@ -31,10 +31,10 @@ func main() {
 
 	// Initialised the database connection.
 	dbCreds := database.DBCredentials{
-		User:     conf.DBUser,
-		Password: conf.DBPassword,
-		Host:     conf.DBHost,
-		Port:     conf.DBPort,
+		User:     conf.Conf().DBUser,
+		Password: conf.Conf().DBPassword,
+		Host:     conf.Conf().DBHost,
+		Port:     conf.Conf().DBPort,
 	}
 	db, err := database.New(ctx, dbCreds, logger)
 	if err != nil {

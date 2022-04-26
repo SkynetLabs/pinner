@@ -38,14 +38,14 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		return
 	}
 	// Create the skylink.
-	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.ServerName)
+	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.Conf().ServerName)
 	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
 	// If the skylink already exists, add this server to its list of servers.
 	if errors.Contains(err, database.ErrSkylinkExists) {
-		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, conf.ServerName)
+		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, conf.Conf().ServerName)
 	}
 	if err != nil {
 		api.WriteError(w, err, http.StatusInternalServerError)
