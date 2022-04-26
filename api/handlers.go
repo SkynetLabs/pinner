@@ -8,7 +8,6 @@ import (
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -38,15 +37,8 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	// Validate the skylink.
-	var sl skymodules.Skylink
-	err = sl.LoadString(body.Skylink)
-	if err != nil {
-		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
-		return
-	}
 	// Create the skylink.
-	_, err = api.staticDB.SkylinkCreate(req.Context(), sl.String(), conf.ServerName)
+	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, conf.ServerName)
 	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
@@ -69,7 +61,7 @@ TODO
  - Mark the skylink for unpinning.
  - Unpin the skylink from the local server and remove the server from the list.
  - Keep the skylink in the DB with the unpinning flag up. This will ensure that
- if the skylink is still pinned to any server and we sweep that sever and add
+ if the skylink is still pinned to any server and we sweep that server and add
  the skylink to the DB, it will be immediately scheduled for unpinning and it
  will be removed from that server.
  - Change the /ping endpoint to check for this flag and remove it, if raised.

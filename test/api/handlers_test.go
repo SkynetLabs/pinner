@@ -11,9 +11,10 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
+// subtest defines the structure of a subtest
 type subtest struct {
 	name string
-	test func(t *testing.T, at *test.Tester)
+	test func(t *testing.T, tt *test.Tester)
 }
 
 // TestHandlers is a meta test that sets up a test instance of pinner and runs
@@ -35,7 +36,7 @@ func TestHandlers(t *testing.T) {
 	}
 	defer func() {
 		if errClose := at.Close(); errClose != nil {
-			t.Error(errors.AddContext(errClose, "failed to close account tester"))
+			t.Error(errors.AddContext(errClose, "failed to close tester"))
 		}
 	}()
 
@@ -54,8 +55,8 @@ func TestHandlers(t *testing.T) {
 }
 
 // testHandlerHealthGET tests the /health handler.
-func testHandlerHealthGET(t *testing.T, at *test.Tester) {
-	status, _, err := at.HealthGET()
+func testHandlerHealthGET(t *testing.T, tt *test.Tester) {
+	status, _, err := tt.HealthGET()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,16 +68,16 @@ func testHandlerHealthGET(t *testing.T, at *test.Tester) {
 }
 
 // testHandlerPinPOST tests "POST /pin"
-func testHandlerPinPOST(t *testing.T, at *test.Tester) {
+func testHandlerPinPOST(t *testing.T, tt *test.Tester) {
 	sl := test.RandomSkylink()
 
 	// Pin an invalid skylink.
-	_, err := at.PinPOST("this is not a skylink")
+	_, err := tt.PinPOST("this is not a skylink")
 	if err == nil || !strings.Contains(err.Error(), database.ErrInvalidSkylink.Error()) {
 		t.Fatalf("Expected error '%s', got '%v'", database.ErrInvalidSkylink, err)
 	}
 	// Pin a valid skylink.
-	status, err := at.PinPOST(sl)
+	status, err := tt.PinPOST(sl)
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}
