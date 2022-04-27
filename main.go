@@ -38,7 +38,7 @@ func main() {
 	}
 	db, err := database.New(ctx, dbCreds, logger)
 	if err != nil {
-		log.Fatal(errors.AddContext(err, "failed to connect to the db"))
+		log.Fatal(errors.AddContext(err, database.ErrCtxFailedToConnect))
 	}
 
 	// Initialise the server.

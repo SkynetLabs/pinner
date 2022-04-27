@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/skynetlabs/pinner/conf"
@@ -20,11 +19,7 @@ func TestSkylink(t *testing.T) {
 	t.Parallel()
 
 	if conf.Conf().ServerName == "" {
-		err := os.Setenv("SERVER_DOMAIN", test.TestServerName)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = conf.LoadConf()
+		err := test.EnsureTestConfiguration()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,12 +53,26 @@ func TestSkylink(t *testing.T) {
 	if s.Skylink != sl {
 		t.Fatalf("Expected skylink '%s', got '%s'", sl, s.Skylink)
 	}
-	// Add the skylink again, expect ErrSkylinkExists.
-	_, err = db.SkylinkCreate(ctx, sl, conf.Conf().ServerName)
-	if !errors.Contains(err, database.ErrSkylinkExists) {
-		t.Fatalf("Expected '%s', got '%v'", database.ErrSkylinkExists, err)
+	// Add the skylink again, expect this to succeed and to add the new server
+	// name to the list of servers, i.e. expect it to add like SkylinkServerAdd.
+	otherServer := "second create"
+	_, err = db.SkylinkCreate(ctx, sl, otherServer)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// TODO Add the same skylink again, this time in base32. Make sure it doesn't get duplicated.
+	s, err = db.SkylinkFetch(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the new server was added to the list.
+	if s.Servers[0] != otherServer && s.Servers[1] != otherServer {
+		t.Fatalf("Expected to find '%s' in the list, got '%v'", otherServer, s.Servers)
+	}
+	// Clean up.
+	err = db.SkylinkServerRemove(ctx, sl, otherServer)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Add a new server to the list.
 	server := "new server"

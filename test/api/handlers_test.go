@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
@@ -27,11 +26,7 @@ func TestHandlers(t *testing.T) {
 	t.Parallel()
 
 	if conf.Conf().ServerName == "" {
-		err := os.Setenv("SERVER_DOMAIN", test.TestServerName)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = conf.LoadConf()
+		err := test.EnsureTestConfiguration()
 		if err != nil {
 			t.Fatal(err)
 		}

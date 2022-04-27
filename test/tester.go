@@ -55,7 +55,7 @@ func NewTester(dbName string) (*Tester, error) {
 	// Connect to the database.
 	db, err := NewDatabase(ctx, dbName)
 	if err != nil {
-		return nil, errors.AddContext(err, "failed to connect to the DB")
+		return nil, errors.AddContext(err, database.ErrCtxFailedToConnect)
 	}
 
 	ctxWithCancel, cancel := context.WithCancel(ctx)

@@ -15,6 +15,10 @@ import (
 )
 
 var (
+	// ErrCtxFailedToConnect is the context we add to an error when we fail to
+	// connect to the db.
+	ErrCtxFailedToConnect = "failed to connect to the db"
+
 	// dbName defines the name of the database this service uses
 	dbName = "pinner"
 	// collSkylinks defines the name of the collection which will hold
@@ -68,11 +72,7 @@ func NewCustomDB(ctx context.Context, dbName string, creds DBCredentials, logger
 		SetCompressors([]string{"zstd", "zlib", "snappy"})
 	c, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		return nil, errors.AddContext(err, "failed to create a new db client")
-	}
-	err = c.Connect(ctx)
-	if err != nil {
-		return nil, errors.AddContext(err, "failed to connect to db")
+		return nil, errors.AddContext(err, ErrCtxFailedToConnect)
 	}
 	db := c.Database(dbName)
 	err = ensureDBSchema(ctx, db, logger)
