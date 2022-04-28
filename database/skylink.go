@@ -3,8 +3,8 @@ package database
 import (
 	"context"
 
-	accdb "github.com/SkynetLabs/skynet-accounts/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/skymodules"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -38,7 +38,9 @@ type (
 // SkylinkCreate inserts a new skylink into the DB. Returns an error if it
 // already exists.
 func (db *DB) SkylinkCreate(ctx context.Context, sl string, server string) (Skylink, error) {
-	if !accdb.ValidSkylinkHash(sl) {
+	var skylink skymodules.Skylink
+	err := skylink.LoadString(sl)
+	if err != nil {
 		return Skylink{}, ErrInvalidSkylink
 	}
 	if server == "" {
@@ -50,7 +52,11 @@ func (db *DB) SkylinkCreate(ctx context.Context, sl string, server string) (Skyl
 	}
 	ir, err := db.staticDB.Collection(collSkylinks).InsertOne(ctx, s)
 	if mongo.IsDuplicateKeyError(err) {
-		return Skylink{}, ErrSkylinkExists
+		err = db.SkylinkServerAdd(ctx, sl, server)
+		if err != nil {
+			return Skylink{}, err
+		}
+		return db.SkylinkFetch(ctx, sl)
 	}
 	if err != nil {
 		return Skylink{}, err

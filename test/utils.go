@@ -3,9 +3,13 @@ package test
 import (
 	"bytes"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 
+	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
+	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/fastrand"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 	"go.sia.tech/siad/crypto"
@@ -16,6 +20,11 @@ var (
 	// to have it in a separate variable, so we can set it in different tests
 	// without worrying about them choosing different names.
 	TestServerName = "test.server.name"
+	// confMu is a mutex which ensures that no two threads are
+	// going to mutate the configuration environment variables at the same time.
+	// This is done, so we can always restore the environment to the state
+	// before the intervention.
+	confMu sync.Mutex
 )
 
 type (
@@ -55,6 +64,53 @@ func DBTestCredentials() database.DBCredentials {
 		Host:     "localhost",
 		Port:     "17018",
 	}
+}
+
+// EnsureTestConfiguration temporarily replaces environment variables with their
+// test values, loads the configuration with these test values and then restores
+// the original environment.
+func EnsureTestConfiguration() error {
+	confMu.Lock()
+	defer confMu.Unlock()
+	envVars := []string{
+		"SERVER_DOMAIN",
+		"SKYNET_DB_USER",
+		"SKYNET_DB_PASS",
+		"SKYNET_DB_HOST",
+		"SKYNET_DB_PORT",
+		"SIA_API_PASSWORD",
+	}
+	// Store the original values.
+	originals := make(map[string]string)
+	for _, ev := range envVars {
+		val, ok := os.LookupEnv(ev)
+		if ok {
+			originals[ev] = val
+		}
+	}
+	// Ensure these will be restored before we return and unlock.
+	defer func() {
+		for _, ev := range envVars {
+			val, ok := originals[ev]
+			if ok {
+				os.Setenv(ev, val)
+			} else {
+				os.Unsetenv(ev)
+			}
+		}
+	}()
+	// Set the test values we need.
+	dbcr := DBTestCredentials()
+	e1 := os.Setenv("SERVER_DOMAIN", TestServerName)
+	e2 := os.Setenv("SKYNET_DB_USER", dbcr.User)
+	e3 := os.Setenv("SKYNET_DB_PASS", dbcr.Password)
+	e4 := os.Setenv("SKYNET_DB_HOST", dbcr.Host)
+	e5 := os.Setenv("SKYNET_DB_PORT", dbcr.Port)
+	e6 := os.Setenv("SIA_API_PASSWORD", "testSiaApiPassword")
+	if err := errors.Compose(e1, e2, e3, e4, e5, e6); err != nil {
+		return err
+	}
+	return conf.LoadConf()
 }
 
 // RandomSkylink generates a random skylink

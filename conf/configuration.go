@@ -8,34 +8,55 @@ import (
 )
 
 var (
-	// AccountsHost defines the IP or hostname of the local accounts service.
-	AccountsHost = "10.10.10.70"
-	// AccountsPort defines the port of the local accounts service.
-	AccountsPort = "3000"
-	// DBUser username for connecting to the database.
-	DBUser string
-	// DBPassword password for connecting to the database.
-	DBPassword string
-	// DBHost host for connecting to the database.
-	DBHost string
-	// DBPort port for connecting to the database.
-	DBPort string
-	// LogLevel defines the logging level of the entire service.
-	LogLevel = "info"
-	// ServerName holds the name of the current server. This name will be used
-	// for identifying which servers are pinning a given skylink.
-	ServerName string
-	// SiaAPIPassword is the apipassword for the local skyd
-	SiaAPIPassword string
-	// SiaAPIHost is the hostname/IP of the local skyd
-	SiaAPIHost = "10.10.10.10"
-	// SiaAPIPort is the port of the local skyd
-	SiaAPIPort = "9980"
+	// configuration is the current state of the configuration.
+	configuration = Config{
+		AccountsHost: "10.10.10.70",
+		AccountsPort: "3000",
+		LogLevel:     "info",
+		SiaAPIHost:   "10.10.10.10",
+		SiaAPIPort:   "9980",
+	}
 )
 
-// LoadConfiguration loads the required service configuration from the
-// environment and the provided .env file.
-func LoadConfiguration() error {
+type (
+	// Config represents the entire configurable state of the service. If a
+	// value is not here, then it can't be configured.
+	//
+	// AccountsHost defines the IP or hostname of the local accounts service.
+	// AccountsPort defines the port of the local accounts service.
+	// DBUser username for connecting to the database.
+	// DBPassword password for connecting to the database.
+	// DBHost host for connecting to the database.
+	// DBPort port for connecting to the database.
+	// LogLevel defines the logging level of the entire service.
+	// ServerName holds the name of the current server. This name will be used
+	// 	for identifying which servers are pinning a given skylink.
+	// SiaAPIPassword is the apipassword for the local skyd
+	// SiaAPIHost is the hostname/IP of the local skyd
+	// SiaAPIPort is the port of the local skyd
+	Config struct {
+		AccountsHost   string
+		AccountsPort   string
+		DBUser         string
+		DBPassword     string
+		DBHost         string
+		DBPort         string
+		LogLevel       string
+		ServerName     string
+		SiaAPIPassword string
+		SiaAPIHost     string
+		SiaAPIPort     string
+	}
+)
+
+// Conf returns the current state of the configuration of the service.
+func Conf() Config {
+	return configuration
+}
+
+// LoadConf loads the required service configuration from the environment and
+// the provided .env file.
+func LoadConf() error {
 	// Load the environment variables from the .env file.
 	// Existing variables take precedence and won't be overwritten.
 	_ = godotenv.Load()
@@ -44,40 +65,40 @@ func LoadConfiguration() error {
 	var val string
 
 	// Required
-	if ServerName, ok = os.LookupEnv("SERVER_DOMAIN"); !ok {
+	if configuration.ServerName, ok = os.LookupEnv("SERVER_DOMAIN"); !ok {
 		return errors.New("missing env var SERVER_DOMAIN")
 	}
-	if DBUser, ok = os.LookupEnv("SKYNET_DB_USER"); !ok {
+	if configuration.DBUser, ok = os.LookupEnv("SKYNET_DB_USER"); !ok {
 		return errors.New("missing env var SKYNET_DB_USER")
 	}
-	if DBPassword, ok = os.LookupEnv("SKYNET_DB_PASS"); !ok {
+	if configuration.DBPassword, ok = os.LookupEnv("SKYNET_DB_PASS"); !ok {
 		return errors.New("missing env var SKYNET_DB_PASS")
 	}
-	if DBHost, ok = os.LookupEnv("SKYNET_DB_HOST"); !ok {
+	if configuration.DBHost, ok = os.LookupEnv("SKYNET_DB_HOST"); !ok {
 		return errors.New("missing env var SKYNET_DB_HOST")
 	}
-	if DBPort, ok = os.LookupEnv("SKYNET_DB_PORT"); !ok {
+	if configuration.DBPort, ok = os.LookupEnv("SKYNET_DB_PORT"); !ok {
 		return errors.New("missing env var SKYNET_DB_PORT")
 	}
-	if SiaAPIPassword, ok = os.LookupEnv("SIA_API_PASSWORD"); !ok {
+	if configuration.SiaAPIPassword, ok = os.LookupEnv("SIA_API_PASSWORD"); !ok {
 		return errors.New("missing env var SIA_API_PASSWORD")
 	}
 
 	// Optional
 	if val, ok = os.LookupEnv("SKYNET_ACCOUNTS_HOST"); ok {
-		AccountsHost = val
+		configuration.AccountsHost = val
 	}
 	if val, ok = os.LookupEnv("SKYNET_ACCOUNTS_PORT"); ok {
-		AccountsPort = val
+		configuration.AccountsPort = val
 	}
 	if val, ok = os.LookupEnv("PINNER_LOG_LEVEL"); ok {
-		LogLevel = val
+		configuration.LogLevel = val
 	}
 	if val, ok = os.LookupEnv("API_HOST"); ok {
-		SiaAPIHost = val
+		configuration.SiaAPIHost = val
 	}
 	if val, ok = os.LookupEnv("API_PORT"); ok {
-		SiaAPIPort = val
+		configuration.SiaAPIPort = val
 	}
 
 	return nil

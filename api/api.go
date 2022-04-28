@@ -32,7 +32,7 @@ func New(db *database.DB, logger *logrus.Logger) (*API, error) {
 		return nil, errors.New("no DB provided")
 	}
 	if logger == nil {
-		logger = logrus.New()
+		return nil, errors.New("invalid logger provided")
 	}
 	router := httprouter.New()
 	router.RedirectTrailingSlash = true

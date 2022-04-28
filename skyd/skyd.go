@@ -40,8 +40,8 @@ type (
 // New creates a new skyd client.
 func New() *Client {
 	opts := client.Options{
-		Address:       fmt.Sprintf("%s:%s", conf.SiaAPIHost, conf.SiaAPIPort),
-		Password:      conf.SiaAPIPassword,
+		Address:       fmt.Sprintf("%s:%s", conf.Conf().SiaAPIHost, conf.Conf().SiaAPIPort),
+		Password:      conf.Conf().SiaAPIPassword,
 		UserAgent:     "Sia-Agent",
 		CheckRedirect: nil,
 	}

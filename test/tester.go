@@ -55,7 +55,7 @@ func NewTester(dbName string) (*Tester, error) {
 	// Connect to the database.
 	db, err := NewDatabase(ctx, dbName)
 	if err != nil {
-		return nil, errors.AddContext(err, "failed to connect to the DB")
+		return nil, errors.AddContext(err, database.ErrCtxFailedToConnect)
 	}
 
 	ctxWithCancel, cancel := context.WithCancel(ctx)
@@ -90,13 +90,13 @@ func NewTester(dbName string) (*Tester, error) {
 		Logger:          logger,
 		cancel:          cancel,
 	}
-	// Wait for the accounts tester to be fully ready.
+	// Wait for the tester to be fully ready.
 	err = build.Retry(50, time.Millisecond, func() error {
 		_, _, e := at.HealthGET()
 		return e
 	})
 	if err != nil {
-		return nil, errors.AddContext(err, "failed to start accounts tester in the given time")
+		return nil, errors.AddContext(err, "failed to start tester in the given time")
 	}
 	return at, nil
 }
@@ -123,10 +123,10 @@ func SanitizeName(s string) string {
 }
 
 // Close performs a graceful shutdown of the Tester service.
-func (at *Tester) Close() error {
-	at.cancel()
-	if at.DB != nil {
-		err := at.DB.Disconnect(at.Ctx)
+func (t *Tester) Close() error {
+	t.cancel()
+	if t.DB != nil {
+		err := t.DB.Disconnect(t.Ctx)
 		if err != nil {
 			return err
 		}
@@ -136,14 +136,14 @@ func (at *Tester) Close() error {
 
 // SetFollowRedirects configures the tester to either follow HTTP redirects or
 // not. The default is to follow them.
-func (at *Tester) SetFollowRedirects(f bool) {
-	at.FollowRedirects = f
+func (t *Tester) SetFollowRedirects(f bool) {
+	t.FollowRedirects = f
 }
 
 // post executes a POST Request against the test service.
 //
 // NOTE: The Body of the returned response is already read and closed.
-func (at *Tester) post(endpoint string, params url.Values, bodyParams url.Values) (*http.Response, []byte, error) {
+func (t *Tester) post(endpoint string, params url.Values, bodyParams url.Values) (*http.Response, []byte, error) {
 	if params == nil {
 		params = url.Values{}
 	}
@@ -164,14 +164,14 @@ func (at *Tester) post(endpoint string, params url.Values, bodyParams url.Values
 		return &http.Response{}, nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	return at.executeRequest(req)
+	return t.executeRequest(req)
 }
 
 // Request is a helper method that puts together and executes an HTTP
 // Request. It attaches the current cookie, if one exists.
 //
 // NOTE: The Body of the returned response is already read and closed.
-func (at *Tester) Request(method string, endpoint string, queryParams url.Values, body []byte, headers map[string]string, obj interface{}) (*http.Response, error) {
+func (t *Tester) Request(method string, endpoint string, queryParams url.Values, body []byte, headers map[string]string, obj interface{}) (*http.Response, error) {
 	if queryParams == nil {
 		queryParams = url.Values{}
 	}
@@ -183,7 +183,7 @@ func (at *Tester) Request(method string, endpoint string, queryParams url.Values
 	for name, val := range headers {
 		req.Header.Set(name, val)
 	}
-	r, b, err := at.executeRequest(req)
+	r, b, err := t.executeRequest(req)
 	// Define a list of response codes we assume are "good". We are going to
 	// return an error if the response returns a code that's not on this list.
 	acceptedResponseCodes := map[int]bool{
@@ -211,12 +211,12 @@ func (at *Tester) Request(method string, endpoint string, queryParams url.Values
 // the response by extracting the body from it and handling non-OK status codes.
 //
 // NOTE: The Body of the returned response is already read and closed.
-func (at *Tester) executeRequest(req *http.Request) (*http.Response, []byte, error) {
+func (t *Tester) executeRequest(req *http.Request) (*http.Response, []byte, error) {
 	if req == nil {
 		return &http.Response{}, nil, errors.New("invalid Request")
 	}
 	client := http.Client{}
-	if !at.FollowRedirects {
+	if !t.FollowRedirects {
 		client.CheckRedirect = dontFollowRedirectsCheckRedirectFn
 	}
 	r, err := client.Do(req)
@@ -242,33 +242,33 @@ func processResponse(r *http.Response) (*http.Response, []byte, error) {
 }
 
 // HealthGET checks the health of the service.
-func (at *Tester) HealthGET() (api.HealthGET, int, error) {
+func (t *Tester) HealthGET() (api.HealthGET, int, error) {
 	var resp api.HealthGET
-	r, err := at.Request(http.MethodGet, "/health", nil, nil, nil, &resp)
+	r, err := t.Request(http.MethodGet, "/health", nil, nil, nil, &resp)
 	return resp, r.StatusCode, err
 }
 
 // PinPOST tells pinner that the current server is pinning a given skylink.
-func (at *Tester) PinPOST(sl string) (int, error) {
+func (t *Tester) PinPOST(sl string) (int, error) {
 	body, err := json.Marshal(api.SkylinkRequest{
 		Skylink: sl,
 	})
 	if err != nil {
 		return http.StatusBadRequest, errors.AddContext(err, "unable to marshal request body")
 	}
-	r, err := at.Request(http.MethodPost, "/pin", nil, body, nil, nil)
+	r, err := t.Request(http.MethodPost, "/pin", nil, body, nil, nil)
 	return r.StatusCode, err
 }
 
 // UnpinPOST tells pinner that no users are pinning this skylink and it should
 // be unpinned by all servers.
-func (at *Tester) UnpinPOST(sl string) (int, error) {
+func (t *Tester) UnpinPOST(sl string) (int, error) {
 	body, err := json.Marshal(api.SkylinkRequest{
 		Skylink: sl,
 	})
 	if err != nil {
 		return http.StatusBadRequest, errors.AddContext(err, "unable to marshal request body")
 	}
-	r, err := at.Request(http.MethodPost, "/unpin", nil, body, nil, nil)
+	r, err := t.Request(http.MethodPost, "/unpin", nil, body, nil, nil)
 	return r.StatusCode, err
 }

@@ -18,8 +18,9 @@ func TestSkylink(t *testing.T) {
 	}
 	t.Parallel()
 
-	if conf.ServerName == "" {
-		conf.ServerName = test.TestServerName
+	err := test.EnsureTestConfiguration()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	ctx := context.Background()
@@ -37,12 +38,12 @@ func TestSkylink(t *testing.T) {
 		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNoExist, err)
 	}
 	// Try to create an invalid skylink.
-	_, err = db.SkylinkCreate(ctx, "this is not a valid skylink", conf.ServerName)
+	_, err = db.SkylinkCreate(ctx, "this is not a valid skylink", conf.Conf().ServerName)
 	if err == nil {
 		t.Fatal("Managed to create an invalid skylink.")
 	}
 	// Create the skylink.
-	s, err := db.SkylinkCreate(ctx, sl, conf.ServerName)
+	s, err := db.SkylinkCreate(ctx, sl, conf.Conf().ServerName)
 	if err != nil {
 		t.Fatal("Failed to create a skylink:", err)
 	}
@@ -50,11 +51,27 @@ func TestSkylink(t *testing.T) {
 	if s.Skylink != sl {
 		t.Fatalf("Expected skylink '%s', got '%s'", sl, s.Skylink)
 	}
-	// Add the skylink again, expect ErrSkylinkExists.
-	_, err = db.SkylinkCreate(ctx, sl, conf.ServerName)
-	if !errors.Contains(err, database.ErrSkylinkExists) {
-		t.Fatalf("Expected '%s', got '%v'", database.ErrSkylinkExists, err)
+	// Add the skylink again, expect this to succeed and to add the new server
+	// name to the list of servers, i.e. expect it to add like SkylinkServerAdd.
+	otherServer := "second create"
+	_, err = db.SkylinkCreate(ctx, sl, otherServer)
+	if err != nil {
+		t.Fatal(err)
 	}
+	s, err = db.SkylinkFetch(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the new server was added to the list.
+	if s.Servers[0] != otherServer && s.Servers[1] != otherServer {
+		t.Fatalf("Expected to find '%s' in the list, got '%v'", otherServer, s.Servers)
+	}
+	// Clean up.
+	err = db.SkylinkServerRemove(ctx, sl, otherServer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Add a new server to the list.
 	server := "new server"
 	err = db.SkylinkServerAdd(ctx, sl, server)
@@ -79,8 +96,8 @@ func TestSkylink(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Make sure the new server was added to the list.
-	if len(s.Servers) != 1 || s.Servers[0] != conf.ServerName {
-		t.Fatalf("Expected to find only '%s' in the list, got '%v'", conf.ServerName, s.Servers)
+	if len(s.Servers) != 1 || s.Servers[0] != conf.Conf().ServerName {
+		t.Fatalf("Expected to find only '%s' in the list, got '%v'", conf.Conf().ServerName, s.Servers)
 	}
 	// Mark the file as unpinned.
 	err = db.SkylinkMarkUnpinned(ctx, sl)
