@@ -8,7 +8,6 @@ import (
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -81,14 +80,7 @@ func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	// Validate the skylink.
-	var sl skymodules.Skylink
-	err = sl.LoadString(body.Skylink)
-	if err != nil {
-		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
-		return
-	}
-	err = api.staticDB.SkylinkMarkUnpinned(req.Context(), sl.String())
+	err = api.staticDB.SkylinkMarkUnpinned(req.Context(), body.Skylink)
 	if err != nil {
 		api.WriteError(w, err, http.StatusInternalServerError)
 		return

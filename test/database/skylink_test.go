@@ -51,20 +51,11 @@ func TestSkylink(t *testing.T) {
 	if s.Skylink != sl {
 		t.Fatalf("Expected skylink '%s', got '%s'", sl, s.Skylink)
 	}
-	// Add the skylink again, expect this to succeed and to add the new server
-	// name to the list of servers, i.e. expect it to add like SkylinkServerAdd.
+	// Add the skylink again, expect this to fail with ErrSkylinkExists.
 	otherServer := "second create"
 	_, err = db.SkylinkCreate(ctx, sl, otherServer)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, err = db.SkylinkFetch(ctx, sl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Make sure the new server was added to the list.
-	if s.Servers[0] != otherServer && s.Servers[1] != otherServer {
-		t.Fatalf("Expected to find '%s' in the list, got '%v'", otherServer, s.Servers)
+	if !errors.Contains(err, database.ErrSkylinkExists) {
+		t.Fatalf("Expected '%v', got '%v'", database.ErrSkylinkExists, err)
 	}
 	// Clean up.
 	err = db.SkylinkServerRemove(ctx, sl, otherServer)
