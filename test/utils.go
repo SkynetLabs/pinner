@@ -66,10 +66,10 @@ func DBTestCredentials() database.DBCredentials {
 	}
 }
 
-// EnsureTestConfiguration temporarily replaces environment variables with their
+// LoadTestConfig temporarily replaces environment variables with their
 // test values, loads the configuration with these test values and then restores
 // the original environment.
-func EnsureTestConfiguration() error {
+func LoadTestConfig() (conf.Config, error) {
 	confMu.Lock()
 	defer confMu.Unlock()
 	envVars := []string{
@@ -108,9 +108,9 @@ func EnsureTestConfiguration() error {
 	e5 := os.Setenv("SKYNET_DB_PORT", dbcr.Port)
 	e6 := os.Setenv("SIA_API_PASSWORD", "testSiaApiPassword")
 	if err := errors.Compose(e1, e2, e3, e4, e5, e6); err != nil {
-		return err
+		return conf.Config{}, err
 	}
-	return conf.LoadConf()
+	return conf.LoadConfig()
 }
 
 // RandomSkylink generates a random skylink

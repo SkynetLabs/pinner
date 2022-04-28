@@ -24,18 +24,13 @@ func TestHandlers(t *testing.T) {
 	}
 	t.Parallel()
 
-	err := test.EnsureTestConfiguration()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	dbName := test.DBNameForTest(t.Name())
-	at, err := test.NewTester(dbName)
+	tt, err := test.NewTester(dbName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if errClose := at.Close(); errClose != nil {
+		if errClose := tt.Close(); errClose != nil {
 			t.Error(errors.AddContext(errClose, "failed to close tester"))
 		}
 	}()
@@ -48,9 +43,9 @@ func TestHandlers(t *testing.T) {
 	}
 
 	// Run subtests
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.test(t, at)
+	for _, tst := range tests {
+		t.Run(tst.name, func(t *testing.T) {
+			tst.test(t, tt)
 		})
 	}
 }

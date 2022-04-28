@@ -52,6 +52,11 @@ func NewTester(dbName string) (*Tester, error) {
 	ctx := context.Background()
 	logger := NewDiscardLogger()
 
+	cfg, err := LoadTestConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	// Connect to the database.
 	db, err := NewDatabase(ctx, dbName)
 	if err != nil {
@@ -61,7 +66,7 @@ func NewTester(dbName string) (*Tester, error) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 
 	// The server API encapsulates all the modules together.
-	server, err := api.New(db, logger)
+	server, err := api.New(cfg, db, logger)
 	if err != nil {
 		cancel()
 		return nil, errors.AddContext(err, "failed to build the API")

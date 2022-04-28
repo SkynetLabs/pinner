@@ -35,13 +35,11 @@ type (
 	}
 )
 
-// TODO Tests
-
 // New creates a new skyd client.
-func New() *Client {
+func New(cfg conf.Config) *Client {
 	opts := client.Options{
-		Address:       fmt.Sprintf("%s:%s", conf.Conf().SiaAPIHost, conf.Conf().SiaAPIPort),
-		Password:      conf.Conf().SiaAPIPassword,
+		Address:       fmt.Sprintf("%s:%s", cfg.SiaAPIHost, cfg.SiaAPIPort),
+		Password:      cfg.SiaAPIPassword,
 		UserAgent:     "Sia-Agent",
 		CheckRedirect: nil,
 	}
