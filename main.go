@@ -8,6 +8,7 @@ import (
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/skyd"
 	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/threadgroup"
@@ -48,7 +49,8 @@ func main() {
 	var tg threadgroup.ThreadGroup
 
 	// Start the background scanner.
-	scanner := workers.NewScanner(cfg, db, logger, &tg)
+	skydClient := skyd.NewClient(cfg)
+	scanner := workers.NewScanner(cfg, db, logger, skydClient, &tg)
 	err = scanner.Start()
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to start Scanner"))

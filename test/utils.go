@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	// TestServerName is what we'll use for ServerName during testing. We want
+	// ServerName is what we'll use for ServerName during testing. We want
 	// to have it in a separate variable, so we can set it in different tests
 	// without worrying about them choosing different names.
-	TestServerName = "test.server.name"
+	ServerName = "test.server.name"
 	// confMu is a mutex which ensures that no two threads are
 	// going to mutate the configuration environment variables at the same time.
 	// This is done, so we can always restore the environment to the state
@@ -101,7 +101,7 @@ func LoadTestConfig() (conf.Config, error) {
 	}()
 	// Set the test values we need.
 	dbcr := DBTestCredentials()
-	e1 := os.Setenv("SERVER_DOMAIN", TestServerName)
+	e1 := os.Setenv("SERVER_DOMAIN", ServerName)
 	e2 := os.Setenv("SKYNET_DB_USER", dbcr.User)
 	e3 := os.Setenv("SKYNET_DB_PASS", dbcr.Password)
 	e4 := os.Setenv("SKYNET_DB_HOST", dbcr.Host)

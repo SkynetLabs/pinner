@@ -35,8 +35,8 @@ type (
 	}
 )
 
-// New creates a new skyd client.
-func New(cfg conf.Config) *Client {
+// NewClient creates a new skyd client.
+func NewClient(cfg conf.Config) *Client {
 	opts := client.Options{
 		Address:       fmt.Sprintf("%s:%s", cfg.SiaAPIHost, cfg.SiaAPIPort),
 		Password:      cfg.SiaAPIPassword,

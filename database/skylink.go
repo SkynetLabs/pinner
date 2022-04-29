@@ -170,6 +170,7 @@ func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string,
 	// is our mechanism for proactively recovering from files being left locked
 	// after a server crash.
 	filter := bson.M{
+		"unpin":     false,
 		"locked_by": server,
 	}
 	update := bson.M{
@@ -194,6 +195,7 @@ func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string,
 
 	// No files locked by the current server were found, look for unlocked ones.
 	filter = bson.M{
+		"unpin": false,
 		// Pinned by fewer than the minimum number of servers.
 		"$expr": bson.M{"$lt": bson.A{bson.M{"$size": "$servers"}, minPinners}},
 		// Not pinned by the given server.
