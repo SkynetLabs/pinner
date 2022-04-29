@@ -8,6 +8,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	gitlab.com/NebulousLabs/errors v0.0.0-20200929122200-06c536cf6975
 	gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40
+	gitlab.com/NebulousLabs/threadgroup v0.0.0-20200608151952-38921fbef213
 	gitlab.com/SkynetLabs/skyd v1.5.10
 	go.mongodb.org/mongo-driver v1.8.3
 	go.sia.tech/siad v1.5.7
@@ -45,7 +46,6 @@ require (
 	gitlab.com/NebulousLabs/persist v0.0.0-20200605115618-007e5e23d877 // indirect
 	gitlab.com/NebulousLabs/ratelimit v0.0.0-20200811080431-99b8f0768b2e // indirect
 	gitlab.com/NebulousLabs/siamux v0.0.0-20211123104731-05f52227c71f // indirect
-	gitlab.com/NebulousLabs/threadgroup v0.0.0-20200608151952-38921fbef213 // indirect
 	gitlab.com/NebulousLabs/writeaheadlog v0.0.0-20200618142844-c59a90f49130 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect

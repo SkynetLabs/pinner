@@ -8,7 +8,9 @@ import (
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/threadgroup"
 )
 
 func main() {
@@ -41,23 +43,24 @@ func main() {
 		log.Fatal(errors.AddContext(err, database.ErrCtxFailedToConnect))
 	}
 
+	// A global thread group that ensures all subprocesses are gracefully
+	// stopped at shutdown.
+	var tg threadgroup.ThreadGroup
+
+	// Start the background scanner.
+	scanner := workers.NewScanner(cfg, db, logger, &tg)
+	err = scanner.Start()
+	if err != nil {
+		log.Fatal(errors.AddContext(err, "failed to start Scanner"))
+	}
+
 	// Initialise the server.
 	server, err := api.New(cfg, db, logger)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
 
-	// TODO Start a background loop that would scan the DB for either unpinned
-	// 	or underpinned skylinks and pins/unpins them.
-
-	/*
-		TODO
-		 - Unpin the skylink from the local server and remove the server from the list.
-		 - Keep the skylink in the DB with the unpinning flag up. This will ensure that
-		 if the skylink is still pinned to any server and we sweep that sever and add
-		 the skylink to the DB, it will be immediately scheduled for unpinning and it
-		 will be removed from that server.
-	*/
-
-	log.Fatal(server.ListenAndServe(4000))
+	err = server.ListenAndServe(4000)
+	errStopping := tg.Stop()
+	log.Fatal(errors.Compose(err, errStopping))
 }

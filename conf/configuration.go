@@ -1,7 +1,9 @@
 package conf
 
 import (
+	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"gitlab.com/NebulousLabs/errors"
@@ -10,11 +12,12 @@ import (
 const (
 	// Default configuration values.
 	// For individual descriptions see Config.
-	defaultAccountsHost = "10.10.10.70"
-	defaultAccountsPort = "3000"
-	defaultLogLevel     = "info"
-	defaultSiaAPIHost   = "10.10.10.10"
-	defaultSiaAPIPort   = "9980"
+	defaultAccountsHost       = "10.10.10.70"
+	defaultAccountsPort       = "3000"
+	defaultLogLevel           = "info"
+	defaultSiaAPIHost         = "10.10.10.10"
+	defaultSiaAPIPort         = "9980"
+	defaultMinNumberOfPinners = 1
 )
 
 type (
@@ -28,23 +31,27 @@ type (
 	// DBHost host for connecting to the database.
 	// DBPort port for connecting to the database.
 	// LogLevel defines the logging level of the entire service.
+	// MinNumberOfPinners defines the minimum number of pinning servers which a
+	// 	skylink needs in order to not be considered underpinned. Anything below
+	// 	this value requires more servers to pin the skylink.
 	// ServerName holds the name of the current server. This name will be used
 	// 	for identifying which servers are pinning a given skylink.
 	// SiaAPIPassword is the apipassword for the local skyd
 	// SiaAPIHost is the hostname/IP of the local skyd
 	// SiaAPIPort is the port of the local skyd
 	Config struct {
-		AccountsHost   string
-		AccountsPort   string
-		DBUser         string
-		DBPassword     string
-		DBHost         string
-		DBPort         string
-		LogLevel       string
-		ServerName     string
-		SiaAPIPassword string
-		SiaAPIHost     string
-		SiaAPIPort     string
+		AccountsHost       string
+		AccountsPort       string
+		DBUser             string
+		DBPassword         string
+		DBHost             string
+		DBPort             string
+		LogLevel           string
+		MinNumberOfPinners int
+		ServerName         string
+		SiaAPIPassword     string
+		SiaAPIHost         string
+		SiaAPIPort         string
 	}
 )
 
@@ -102,6 +109,13 @@ func LoadConfig() (Config, error) {
 	}
 	if val, ok = os.LookupEnv("API_PORT"); ok {
 		cfg.SiaAPIPort = val
+	}
+	if val, ok = os.LookupEnv("PINNER_MIN_PINNERS"); ok {
+		num, err := strconv.Atoi(val)
+		if err != nil || num < 1 {
+			return Config{}, fmt.Errorf("invalid PINNER_MIN_PINNERS value, it needs to be a natural number (an integer > 0)")
+		}
+		cfg.MinNumberOfPinners = num
 	}
 
 	return cfg, nil

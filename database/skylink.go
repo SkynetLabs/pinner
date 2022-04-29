@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
@@ -21,6 +22,11 @@ var (
 	// ErrSkylinkNoExist is returned when we try to get a skylink that doesn't
 	// exist.
 	ErrSkylinkNoExist = errors.New("skylink does not exist")
+
+	// LockDuration defines the duration of a database lock. We lock skylinks
+	// while we are trying to pin them to a new server. The goal is to only
+	// allow a single server to pin a given skylink at a time.
+	LockDuration = 24 * time.Hour
 )
 
 type (
@@ -28,10 +34,12 @@ type (
 	// The Unpin field instructs all servers, currently pinning this skylink,
 	// that there are no users pinning and the servers should unpin it as well.
 	Skylink struct {
-		ID      primitive.ObjectID `bson:"_id,omitempty"`
-		Skylink string             `bson:"skylink"`
-		Servers []string           `bson:"servers"`
-		Unpin   bool               `bson:"unpin"`
+		ID          primitive.ObjectID `bson:"_id,omitempty"`
+		Skylink     string             `bson:"skylink"`
+		Servers     []string           `bson:"servers"`
+		Unpin       bool               `bson:"unpin"`
+		LockedBy    string             `bson:"locked_by"`
+		LockExpires time.Time          `bson:"lock_expires"`
 	}
 )
 
@@ -141,6 +149,76 @@ func (db *DB) SkylinkServerRemove(ctx context.Context, skylink string, server st
 	}
 	update := bson.M{"$pull": bson.M{"servers": server}}
 	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	return err
+}
+
+// SkylinkFetchAndLockUnderpinned fetches and locks a single underpinned skylink
+// from the database. The method selects only skylinks which are not pinned by
+// the given server.
+//
+// The MongoDB query is this:
+// db.getCollection('skylinks').find({
+//     "$expr": { "$lt": [{ "$size": "$servers" }, 2 ]},
+//     "servers": { "$nin": [ "ro-tex.siasky.ivo.NOPE" ]},
+//     "$or": [
+//         { "lock_expires" : { "$exists": false }},
+//         { "lock_expires" : { "$lt": new Date() }}
+//     ]
+// })
+func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string, minPinners int) (string, error) {
+	filter := bson.M{
+		// Pinned by fewer than the minimum number of servers.
+		"$expr": bson.M{"$lt": bson.A{bson.M{"$size": "$servers"}, minPinners}},
+		// Not pinned by the given server.
+		"servers": bson.M{"$nin": bson.A{server}},
+		// Unlocked.
+		"$or": bson.A{
+			bson.M{"lock_expires": bson.M{"$exists": false}},
+			bson.M{"lock_expires": bson.M{"$lt": time.Now().UTC()}},
+		},
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"locked_by":    server,
+			"lock_expires": time.Now().UTC().Add(LockDuration).Truncate(time.Millisecond),
+		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	sr := db.staticDB.Collection(collSkylinks).FindOneAndUpdate(ctx, filter, update, opts)
+	if sr.Err() == mongo.ErrNoDocuments {
+		return "", ErrSkylinkNoExist
+	}
+	if sr.Err() != nil {
+		return "", sr.Err()
+	}
+	var result struct {
+		Skylink string
+	}
+	err := sr.Decode(&result)
+	if err != nil {
+		return "", errors.AddContext(err, "failed to decode result")
+	}
+	return result.Skylink, nil
+}
+
+// SkylinkUnlock removes the lock on the skylink put while we're trying to pin
+// it to a new server.
+func (db *DB) SkylinkUnlock(ctx context.Context, sl string, server string) error {
+	filter := bson.M{
+		"skylink":   sl,
+		"locked_by": server,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"locked_by":    "",
+			"lock_expires": time.Time{},
+		},
+	}
+	ur, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	if errors.Contains(err, mongo.ErrNoDocuments) || ur.ModifiedCount == 0 {
+		return ErrSkylinkNoExist
+	}
 	return err
 }
 
