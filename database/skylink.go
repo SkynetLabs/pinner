@@ -166,7 +166,34 @@ func (db *DB) SkylinkServerRemove(ctx context.Context, skylink string, server st
 //     ]
 // })
 func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string, minPinners int) (string, error) {
+	// First try to fetch a skylink which is locked by the current server. This
+	// is our mechanism for proactively recovering from files being left locked
+	// after a server crash.
 	filter := bson.M{
+		"locked_by": server,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"lock_expires": time.Now().UTC().Add(LockDuration).Truncate(time.Millisecond),
+		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	sr := db.staticDB.Collection(collSkylinks).FindOne(ctx, filter)
+	// Ignore all errors and only return if everything is fine. All problematic
+	// cases will either cause errors in the next call or they'll be resolved by
+	// the lock expiring.
+	if sr.Err() == nil {
+		var result struct {
+			Skylink string
+		}
+		err := sr.Decode(&result)
+		if err == nil {
+			return result.Skylink, nil
+		}
+	}
+
+	// No files locked by the current server were found, look for unlocked ones.
+	filter = bson.M{
 		// Pinned by fewer than the minimum number of servers.
 		"$expr": bson.M{"$lt": bson.A{bson.M{"$size": "$servers"}, minPinners}},
 		// Not pinned by the given server.
@@ -177,15 +204,13 @@ func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string,
 			bson.M{"lock_expires": bson.M{"$lt": time.Now().UTC()}},
 		},
 	}
-	update := bson.M{
+	update = bson.M{
 		"$set": bson.M{
 			"locked_by":    server,
 			"lock_expires": time.Now().UTC().Add(LockDuration).Truncate(time.Millisecond),
 		},
 	}
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-
-	sr := db.staticDB.Collection(collSkylinks).FindOneAndUpdate(ctx, filter, update, opts)
+	sr = db.staticDB.Collection(collSkylinks).FindOneAndUpdate(ctx, filter, update, opts)
 	if sr.Err() == mongo.ErrNoDocuments {
 		return "", ErrSkylinkNoExist
 	}
