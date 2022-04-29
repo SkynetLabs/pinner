@@ -24,6 +24,13 @@ type (
 	Client struct {
 		staticClient *client.Client
 	}
+	// ClientInterface describes the interface exposed by Client, so we can
+	// mock it for testing.
+	ClientInterface interface {
+		Pin(skylink string) error
+		PinnedSkylinks() (skylinks []string, err error)
+		Unpin(skylink string) error
+	}
 
 	// renterDirCache is a simple cache of the renter's directory information,
 	// so we don't need to fetch that for each skylink we potentially want to

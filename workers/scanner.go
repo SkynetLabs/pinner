@@ -48,13 +48,13 @@ type (
 		staticCfg        conf.Config
 		staticDB         *database.DB
 		staticLogger     *logrus.Logger
-		staticSkydClient *skyd.Client
+		staticSkydClient skyd.ClientInterface
 		staticTG         *threadgroup.ThreadGroup
 	}
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(cfg conf.Config, db *database.DB, logger *logrus.Logger, skydClient *skyd.Client, tg *threadgroup.ThreadGroup) *Scanner {
+func NewScanner(cfg conf.Config, db *database.DB, logger *logrus.Logger, skydClient skyd.ClientInterface, tg *threadgroup.ThreadGroup) *Scanner {
 	return &Scanner{
 		staticCfg:        cfg,
 		staticDB:         db,
