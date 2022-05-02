@@ -98,9 +98,8 @@ func (db *DB) SkylinkMarkPinned(ctx context.Context, skylink string) error {
 	}
 	filter := bson.M{"skylink": sl}
 	update := bson.M{"$set": bson.M{"unpin": false}}
-	opts := options.UpdateOptions{}
-	opts.SetUpsert(true)
-	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	opts := options.Update().SetUpsert(true)
+	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err
 }
 
@@ -113,9 +112,8 @@ func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink string) error {
 	}
 	filter := bson.M{"skylink": sl}
 	update := bson.M{"$set": bson.M{"unpin": true}}
-	opts := options.UpdateOptions{}
-	opts.SetUpsert(true)
-	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	opts := options.Update().SetUpsert(true)
+	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err
 }
 
@@ -129,9 +127,8 @@ func (db *DB) SkylinkServerAdd(ctx context.Context, skylink string, server strin
 	}
 	filter := bson.M{"skylink": sl}
 	update := bson.M{"$addToSet": bson.M{"servers": server}}
-	opts := options.UpdateOptions{}
-	opts.SetUpsert(true)
-	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, &opts)
+	opts := options.Update().SetUpsert(true)
+	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err
 }
 

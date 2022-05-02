@@ -39,7 +39,7 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		return
 	}
 	// Create the skylink.
-	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, api.staticConfig.ServerName)
+	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, api.staticServerName)
 	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
@@ -61,7 +61,7 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 				return
 			}
 		}
-		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, api.staticConfig.ServerName)
+		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, api.staticServerName)
 	}
 	if err != nil {
 		api.WriteError(w, err, http.StatusInternalServerError)

@@ -66,7 +66,7 @@ func NewTester(dbName string) (*Tester, error) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 
 	// The server API encapsulates all the modules together.
-	server, err := api.New(cfg, db, logger)
+	server, err := api.New(cfg.ServerName, db, logger)
 	if err != nil {
 		cancel()
 		return nil, errors.AddContext(err, "failed to build the API")

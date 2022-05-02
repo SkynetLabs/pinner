@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
 )
 
@@ -23,35 +24,28 @@ const (
 type (
 	// Config represents the entire configurable state of the service. If a
 	// value is not here, then it can't be configured.
-	//
-	// AccountsHost defines the IP or hostname of the local accounts service.
-	// AccountsPort defines the port of the local accounts service.
-	// DBUser username for connecting to the database.
-	// DBPassword password for connecting to the database.
-	// DBHost host for connecting to the database.
-	// DBPort port for connecting to the database.
-	// LogLevel defines the logging level of the entire service.
-	// MinNumberOfPinners defines the minimum number of pinning servers which a
-	// 	skylink needs in order to not be considered underpinned. Anything below
-	// 	this value requires more servers to pin the skylink.
-	// ServerName holds the name of the current server. This name will be used
-	// 	for identifying which servers are pinning a given skylink.
-	// SiaAPIPassword is the apipassword for the local skyd
-	// SiaAPIHost is the hostname/IP of the local skyd
-	// SiaAPIPort is the port of the local skyd
 	Config struct {
-		AccountsHost       string
-		AccountsPort       string
-		DBUser             string
-		DBPassword         string
-		DBHost             string
-		DBPort             string
-		LogLevel           string
+		// AccountsHost defines the IP or hostname of the local accounts service.
+		AccountsHost string
+		// AccountsPort defines the port of the local accounts service.
+		AccountsPort string
+		// DBCredentials holds all the information we need to connect to the DB.
+		DBCredentials database.DBCredentials
+		// LogLevel defines the logging level of the entire service.
+		LogLevel string
+		// MinNumberOfPinners defines the minimum number of pinning servers which a
+		// 	skylink needs in order to not be considered underpinned. Anything below
+		// 	this value requires more servers to pin the skylink.
 		MinNumberOfPinners int
-		ServerName         string
-		SiaAPIPassword     string
-		SiaAPIHost         string
-		SiaAPIPort         string
+		// ServerName holds the name of the current server. This name will be
+		// used for identifying which servers are pinning a given skylink.
+		ServerName string
+		// SiaAPIPassword is the apipassword for the local skyd
+		SiaAPIPassword string
+		// SiaAPIHost is the hostname/IP of the local skyd
+		SiaAPIHost string
+		// SiaAPIPort is the port of the local skyd
+		SiaAPIPort string
 	}
 )
 
@@ -64,11 +58,13 @@ func LoadConfig() (Config, error) {
 
 	// Start with the default values.
 	cfg := Config{
-		AccountsHost: defaultAccountsHost,
-		AccountsPort: defaultAccountsPort,
-		LogLevel:     defaultLogLevel,
-		SiaAPIHost:   defaultSiaAPIHost,
-		SiaAPIPort:   defaultSiaAPIPort,
+		AccountsHost:       defaultAccountsHost,
+		AccountsPort:       defaultAccountsPort,
+		DBCredentials:      database.DBCredentials{},
+		LogLevel:           defaultLogLevel,
+		MinNumberOfPinners: 1,
+		SiaAPIHost:         defaultSiaAPIHost,
+		SiaAPIPort:         defaultSiaAPIPort,
 	}
 
 	var ok bool
@@ -78,16 +74,16 @@ func LoadConfig() (Config, error) {
 	if cfg.ServerName, ok = os.LookupEnv("SERVER_DOMAIN"); !ok {
 		return Config{}, errors.New("missing env var SERVER_DOMAIN")
 	}
-	if cfg.DBUser, ok = os.LookupEnv("SKYNET_DB_USER"); !ok {
+	if cfg.DBCredentials.User, ok = os.LookupEnv("SKYNET_DB_USER"); !ok {
 		return Config{}, errors.New("missing env var SKYNET_DB_USER")
 	}
-	if cfg.DBPassword, ok = os.LookupEnv("SKYNET_DB_PASS"); !ok {
+	if cfg.DBCredentials.Password, ok = os.LookupEnv("SKYNET_DB_PASS"); !ok {
 		return Config{}, errors.New("missing env var SKYNET_DB_PASS")
 	}
-	if cfg.DBHost, ok = os.LookupEnv("SKYNET_DB_HOST"); !ok {
+	if cfg.DBCredentials.Host, ok = os.LookupEnv("SKYNET_DB_HOST"); !ok {
 		return Config{}, errors.New("missing env var SKYNET_DB_HOST")
 	}
-	if cfg.DBPort, ok = os.LookupEnv("SKYNET_DB_PORT"); !ok {
+	if cfg.DBCredentials.Port, ok = os.LookupEnv("SKYNET_DB_PORT"); !ok {
 		return Config{}, errors.New("missing env var SKYNET_DB_PORT")
 	}
 	if cfg.SiaAPIPassword, ok = os.LookupEnv("SIA_API_PASSWORD"); !ok {

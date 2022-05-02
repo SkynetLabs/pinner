@@ -7,7 +7,6 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
-	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
@@ -16,10 +15,10 @@ import (
 type (
 	// API is the central struct which gives us access to all subsystems.
 	API struct {
-		staticConfig conf.Config
-		staticDB     *database.DB
-		staticRouter *httprouter.Router
-		staticLogger *logrus.Logger
+		staticServerName string
+		staticDB         *database.DB
+		staticRouter     *httprouter.Router
+		staticLogger     *logrus.Logger
 	}
 
 	// errorWrap is a helper type for converting an `error` struct to JSON.
@@ -29,7 +28,7 @@ type (
 )
 
 // New returns a new initialised API.
-func New(cfg conf.Config, db *database.DB, logger *logrus.Logger) (*API, error) {
+func New(serverName string, db *database.DB, logger *logrus.Logger) (*API, error) {
 	if db == nil {
 		return nil, errors.New("no DB provided")
 	}
@@ -40,10 +39,10 @@ func New(cfg conf.Config, db *database.DB, logger *logrus.Logger) (*API, error) 
 	router.RedirectTrailingSlash = true
 
 	apiInstance := &API{
-		staticConfig: cfg,
-		staticDB:     db,
-		staticRouter: router,
-		staticLogger: logger,
+		staticServerName: serverName,
+		staticDB:         db,
+		staticRouter:     router,
+		staticLogger:     logger,
 	}
 	apiInstance.buildHTTPRoutes()
 	return apiInstance, nil
