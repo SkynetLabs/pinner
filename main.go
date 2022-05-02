@@ -30,19 +30,13 @@ func main() {
 	logger.SetLevel(logLevel)
 
 	// Initialised the database connection.
-	dbCreds := database.DBCredentials{
-		User:     cfg.DBUser,
-		Password: cfg.DBPassword,
-		Host:     cfg.DBHost,
-		Port:     cfg.DBPort,
-	}
-	db, err := database.New(ctx, dbCreds, logger)
+	db, err := database.New(ctx, cfg.DBCredentials, logger)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, database.ErrCtxFailedToConnect))
 	}
 
 	// Initialise the server.
-	server, err := api.New(cfg, db, logger)
+	server, err := api.New(cfg.ServerName, db, logger)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
