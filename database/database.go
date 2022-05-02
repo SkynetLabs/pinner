@@ -104,7 +104,7 @@ func (db *DB) Ping(ctx context.Context) error {
 // See https://docs.mongodb.com/manual/indexes/
 // See https://docs.mongodb.com/manual/core/index-unique/
 func ensureDBSchema(ctx context.Context, db *mongo.Database, log *logrus.Logger) error {
-	for collName, models := range schema {
+	for collName, models := range schema() {
 		coll, err := ensureCollection(ctx, db, collName)
 		if err != nil {
 			return err

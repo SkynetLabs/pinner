@@ -15,7 +15,7 @@ func TestSkylink(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// t.Parallel() // TODO Why does this cause a data race?
+	t.Parallel()
 
 	cfg, err := test.LoadTestConfig()
 	if err != nil {
@@ -120,7 +120,7 @@ func TestFetchAndLock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// t.Parallel()
+	t.Parallel()
 
 	cfg, err := test.LoadTestConfig()
 	if err != nil {
@@ -238,7 +238,7 @@ func TestFetchAndLockOwnFirst(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// t.Parallel()
+	t.Parallel()
 
 	cfg, err := test.LoadTestConfig()
 	if err != nil {

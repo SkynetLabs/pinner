@@ -4,6 +4,7 @@ import "testing"
 
 // TestSanitizeName ensures that SanitizeName works as expected.
 func TestSanitizeName(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		input    string
 		expected string
