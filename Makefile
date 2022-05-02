@@ -15,7 +15,7 @@ all: release
 count = 1
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-pkgs = ./ ./accounts ./api ./database ./skyd
+pkgs = ./ ./api ./database ./skyd
 
 # integration-pkgs defines the packages which contain integration tests
 integration-pkgs = ./test ./test/api ./test/database

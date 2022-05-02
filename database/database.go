@@ -3,36 +3,27 @@ package database
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"gitlab.com/NebulousLabs/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 var (
+	// ErrCtxFailedToConnect is the context we add to an error when we fail to
+	// connect to the db.
+	ErrCtxFailedToConnect = "failed to connect to the db"
+
 	// dbName defines the name of the database this service uses
 	dbName = "pinner"
 	// collSkylinks defines the name of the collection which will hold
 	// information about skylinks
 	collSkylinks = "skylinks"
-
-	// mongoCompressors defines the compressors we are going to use for the
-	// connection to MongoDB
-	mongoCompressors = "zstd,zlib,snappy"
-	// mongoReadPreference defines the DB's read preference. The options are:
-	// primary, primaryPreferred, secondary, secondaryPreferred, nearest.
-	// See https://docs.mongodb.com/manual/core/read-preference/
-	mongoReadPreference = "primary"
-	// mongoWriteConcern describes the level of acknowledgment requested from
-	// MongoDB.
-	mongoWriteConcern = "majority"
-	// mongoWriteConcernTimeout specifies a time limit, in milliseconds, for
-	// the write concern to be satisfied.
-	mongoWriteConcernTimeout = "30000"
 )
 
 type (
@@ -67,13 +58,21 @@ func NewCustomDB(ctx context.Context, dbName string, creds DBCredentials, logger
 	if logger == nil {
 		return nil, errors.New("invalid logger provided")
 	}
-	c, err := mongo.NewClient(options.Client().ApplyURI(connectionString(creds)))
-	if err != nil {
-		return nil, errors.AddContext(err, "failed to create a new db client")
+
+	auth := options.Credential{
+		Username: creds.User,
+		Password: creds.Password,
 	}
-	err = c.Connect(ctx)
+	opts := options.Client().
+		ApplyURI(fmt.Sprintf("mongodb://%s:%s/", creds.Host, creds.Port)).
+		SetAuth(auth).
+		SetReadConcern(readconcern.Local()).
+		SetReadPreference(readpref.Nearest()).
+		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.WTimeout(30*time.Second))).
+		SetCompressors([]string{"zstd", "zlib", "snappy"})
+	c, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		return nil, errors.AddContext(err, "failed to connect to db")
+		return nil, errors.AddContext(err, ErrCtxFailedToConnect)
 	}
 	db := c.Database(dbName)
 	err = ensureDBSchema(ctx, db, logger)
@@ -100,27 +99,6 @@ func (db *DB) Ping(ctx context.Context) error {
 	return db.staticDB.Client().Ping(ctx2, readpref.Primary())
 }
 
-// connectionString is a helper that returns a valid MongoDB connection string
-// based on the passed credentials and a set of constants. The connection string
-// is using the standalone approach because the service is supposed to talk to
-// the replica set only via the local node.
-// See https://docs.mongodb.com/manual/reference/connection-string/
-func connectionString(creds DBCredentials) string {
-	// There are some symbols in usernames and passwords that need to be escaped.
-	// See https://docs.mongodb.com/manual/reference/connection-string/#components
-	return fmt.Sprintf(
-		"mongodb://%s:%s@%s:%s/?compressors=%s&readPreference=%s&w=%s&wtimeoutMS=%s",
-		url.QueryEscape(creds.User),
-		url.QueryEscape(creds.Password),
-		creds.Host,
-		creds.Port,
-		mongoCompressors,
-		mongoReadPreference,
-		mongoWriteConcern,
-		mongoWriteConcernTimeout,
-	)
-}
-
 // ensureDBSchema checks that we have all collections and indexes we need and
 // creates them if needed.
 // See https://docs.mongodb.com/manual/indexes/
@@ -132,8 +110,7 @@ func ensureDBSchema(ctx context.Context, db *mongo.Database, log *logrus.Logger)
 			return err
 		}
 		iv := coll.Indexes()
-		var names []string
-		names, err = iv.CreateMany(ctx, models)
+		names, err := iv.CreateMany(ctx, models)
 		if err != nil {
 			return errors.AddContext(err, "failed to create indexes")
 		}

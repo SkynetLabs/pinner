@@ -5,10 +5,8 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -31,6 +29,8 @@ func (api *API) healthGET(w http.ResponseWriter, req *http.Request, _ httprouter
 }
 
 // pinPOST informs pinner that a given skylink is pinned on the current server.
+// If the skylink already exists and it's marked for unpinning, this method will
+// unmark it.
 func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var body SkylinkRequest
 	err := json.NewDecoder(req.Body).Decode(&body)
@@ -38,22 +38,30 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	// Validate the skylink.
-	var sl skymodules.Skylink
-	err = sl.LoadString(body.Skylink)
-	if err != nil {
-		api.WriteError(w, err, http.StatusBadRequest)
-		return
-	}
 	// Create the skylink.
-	_, err = api.staticDB.SkylinkCreate(req.Context(), sl.String(), conf.ServerName)
+	_, err = api.staticDB.SkylinkCreate(req.Context(), body.Skylink, api.staticConfig.ServerName)
 	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
 	// If the skylink already exists, add this server to its list of servers.
 	if errors.Contains(err, database.ErrSkylinkExists) {
-		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, conf.ServerName)
+		var s database.Skylink
+		s, err = api.staticDB.SkylinkFetch(req.Context(), body.Skylink)
+		if err != nil {
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
+		// If the skylink is marked as unpinned we mark is as pinned again
+		// because a user just pinned it.
+		if s.Unpin {
+			err = api.staticDB.SkylinkMarkPinned(req.Context(), body.Skylink)
+			if err != nil {
+				api.WriteError(w, err, http.StatusInternalServerError)
+				return
+			}
+		}
+		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, api.staticConfig.ServerName)
 	}
 	if err != nil {
 		api.WriteError(w, err, http.StatusInternalServerError)
@@ -64,18 +72,19 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 
 // unpinPOST informs pinner that a given skylink should no longer be pinned by
 // any server.
-/*
-TODO
- - Mark the skylink for unpinning.
- - Unpin the skylink from the local server and remove the server from the list.
- - Keep the skylink in the DB with the unpinning flag up. This will ensure that
- if the skylink is still pinned to any server and we sweep that sever and add
- the skylink to the DB, it will be immediately scheduled for unpinning and it
- will be removed from that server.
- - Change the /ping endpoint to check for this flag and remove it, if raised.
-*/
-func (api *API) unpinPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
+func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var body SkylinkRequest
+	err := json.NewDecoder(req.Body).Decode(&body)
+	if err != nil {
+		api.WriteError(w, err, http.StatusBadRequest)
+		return
+	}
+	err = api.staticDB.SkylinkMarkUnpinned(req.Context(), body.Skylink)
+	if err != nil {
+		api.WriteError(w, err, http.StatusInternalServerError)
+		return
+	}
+	api.WriteSuccess(w)
 }
 
 // sweepPOST instructs pinner to scan the list of skylinks pinned by skyd and

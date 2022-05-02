@@ -15,12 +15,20 @@ var schema = map[string][]mongo.IndexModel{
 			Options: options.Index().SetName("skylink").SetUnique(true),
 		},
 		{
+			Keys:    bson.D{{"locked_by", 1}},
+			Options: options.Index().SetName("locked_by"),
+		},
+		{
 			Keys:    bson.D{{"lock_expires", 1}},
 			Options: options.Index().SetName("lock_expires"),
 		},
 		{
 			Keys:    bson.D{{"servers", 1}},
 			Options: options.Index().SetName("servers"),
+		},
+		{
+			Keys:    bson.D{{"unpin", 1}},
+			Options: options.Index().SetName("unpin"),
 		},
 	},
 }
