@@ -14,6 +14,16 @@ type (
 	}
 )
 
+// IsPinning checks whether skyd is pinning the given skylink.
+func (c *SkydClientMock) IsPinning(sl string) bool {
+	for _, s := range c.pinnedSkylinks {
+		if s == sl {
+			return true
+		}
+	}
+	return false
+}
+
 // Pin mocks a pin action and responds with a predefined error.
 // If the predefined error is nil, it adds the given skylink to the list of
 // skylinks pinned in the mock.

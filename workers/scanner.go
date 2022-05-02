@@ -10,6 +10,7 @@ import (
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/threadgroup"
+	"gitlab.com/SkynetLabs/skyd/build"
 )
 
 /**
@@ -27,16 +28,26 @@ TODO
  - add a second scanner which looks for skylinks which should be unpinned and unpins them from the local skyd.
 */
 
-const (
-	// sleepBetweenPins defines how long we'll sleep between pinning files.
+var (
+	// SleepBetweenPins defines how long we'll sleep between pinning files.
 	// We want to add this sleep in order to prevent a single server from
 	// grabbing all underpinned files and overloading itself. We also want to
 	// allow for some time for the newly pinned files to reach full redundancy
 	// before we pin more files.
-	sleepBetweenPins = 10 * time.Second
-	// sleepBetweenScans defines how often we'll scan the DB for underpinned
+	SleepBetweenPins = build.Select(
+		build.Var{
+			Standard: 10 * time.Second,
+			Dev:      time.Second,
+			Testing:  time.Millisecond,
+		}).(time.Duration)
+
+	// SleepBetweenScans defines how often we'll scan the DB for underpinned
 	// skylinks.
-	sleepBetweenScans = 24 * time.Hour
+	SleepBetweenScans = build.Select(build.Var{
+		Standard: 24 * time.Hour,
+		Dev:      10 * time.Second,
+		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
 )
 
 type (
@@ -77,7 +88,7 @@ func (s *Scanner) Start() error {
 		for {
 			s.threadedScanAndPin()
 			select {
-			case <-time.After(sleepBetweenScans):
+			case <-time.After(SleepBetweenScans):
 			case <-s.staticTG.StopChan():
 				return
 			}
@@ -117,7 +128,7 @@ func (s *Scanner) threadedScanAndPin() {
 
 		// Sleep for a bit before continuing with the next skylink.
 		select {
-		case <-time.After(sleepBetweenPins):
+		case <-time.After(SleepBetweenPins):
 		case <-s.staticTG.StopChan():
 			return
 		}
