@@ -36,18 +36,13 @@ func TestSkylink(t *testing.T) {
 	if !errors.Contains(err, database.ErrSkylinkNoExist) {
 		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNoExist, err)
 	}
-	// Try to create an invalid skylink.
-	_, err = db.SkylinkCreate(ctx, "this is not a valid skylink", cfg.ServerName)
-	if err == nil {
-		t.Fatal("Managed to create an invalid skylink.")
-	}
 	// Create the skylink.
 	s, err := db.SkylinkCreate(ctx, sl, cfg.ServerName)
 	if err != nil {
 		t.Fatal("Failed to create a skylink:", err)
 	}
 	// Validate that the underlying skylink is the same.
-	if s.Skylink != sl {
+	if s.Skylink != sl.String() {
 		t.Fatalf("Expected skylink '%s', got '%s'", sl, s.Skylink)
 	}
 	// Add the skylink again, expect this to fail with ErrSkylinkExists.
@@ -164,7 +159,7 @@ func TestFetchAndLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if underpinned != sl {
+	if !underpinned.Equals(sl) {
 		t.Fatalf("Expected to get '%s', got '%v'", sl, underpinned)
 	}
 	// Try to fetch an underpinned skylink from the name of a different server.

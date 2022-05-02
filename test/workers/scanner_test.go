@@ -53,7 +53,7 @@ func TestScanner(t *testing.T) {
 	// Sleep for two cycles.
 	time.Sleep(2 * workers.SleepBetweenScans)
 	// Make sure the skylink isn't pinned on the local (mock) skyd.
-	if skydcm.IsPinning(sl) {
+	if skydcm.IsPinning(sl.String()) {
 		t.Fatal("We didn't expect skyd to be pinning this.")
 	}
 	// Remove the other server, making the file underpinned.
@@ -65,7 +65,7 @@ func TestScanner(t *testing.T) {
 	// local skyd.
 	time.Sleep(workers.SleepBetweenScans)
 	// Make sure the skylink is pinned on the local (mock) skyd.
-	if !skydcm.IsPinning(sl) {
+	if !skydcm.IsPinning(sl.String()) {
 		t.Fatal("We expected skyd to be pinning this.")
 	}
 }

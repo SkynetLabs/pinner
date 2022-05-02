@@ -73,7 +73,7 @@ func testHandlerPinPOST(t *testing.T, tt *test.Tester) {
 		t.Fatalf("Expected error '%s', got '%v'", database.ErrInvalidSkylink, err)
 	}
 	// Pin a valid skylink.
-	status, err := tt.PinPOST(sl)
+	status, err := tt.PinPOST(sl.String())
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}
@@ -84,7 +84,7 @@ func testHandlerPinPOST(t *testing.T, tt *test.Tester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status, err = tt.PinPOST(sl)
+	status, err = tt.PinPOST(sl.String())
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}
@@ -107,12 +107,12 @@ func testHandlerUnpinPOST(t *testing.T, at *test.Tester) {
 		t.Fatalf("Expected error '%s', got '%v'", database.ErrInvalidSkylink, err)
 	}
 	// Pin a valid skylink.
-	status, err := at.PinPOST(sl)
+	status, err := at.PinPOST(sl.String())
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}
 	// Unpin the skylink.
-	status, err = at.UnpinPOST(sl)
+	status, err = at.UnpinPOST(sl.String())
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}
@@ -126,7 +126,7 @@ func testHandlerUnpinPOST(t *testing.T, at *test.Tester) {
 	}
 	// Unpin a valid skylink that's not in the DB, yet.
 	sl2 := test.RandomSkylink()
-	status, err = at.UnpinPOST(sl2)
+	status, err = at.UnpinPOST(sl2.String())
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}

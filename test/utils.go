@@ -114,9 +114,11 @@ func LoadTestConfig() (conf.Config, error) {
 }
 
 // RandomSkylink generates a random skylink
-func RandomSkylink() string {
+func RandomSkylink() skymodules.Skylink {
 	var h crypto.Hash
 	fastrand.Read(h[:])
+	// We can ignore the error because that's only returned when
+	// offset + length > 1<<22.
 	sl, _ := skymodules.NewSkylinkV1(h, 0, 0)
-	return sl.String()
+	return sl
 }

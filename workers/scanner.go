@@ -118,7 +118,7 @@ func (s *Scanner) threadedScanAndPin() {
 					s.staticLogger.Debug(errors.AddContext(err, "failed to unlock skylink after trying to pin it"))
 				}
 			}()
-			err = s.staticSkydClient.Pin(sl)
+			err = s.staticSkydClient.Pin(sl.String())
 			if err != nil {
 				s.staticLogger.Warn(errors.AddContext(err, "failed to pin skylink"))
 				return
