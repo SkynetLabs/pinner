@@ -120,13 +120,28 @@ func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink string) error {
 // SkylinkServerAdd adds a new server to the list of servers known to be pinning
 // this skylink. If the skylink does not already exist in the database it will
 // be inserted. This operation is idempotent.
-func (db *DB) SkylinkServerAdd(ctx context.Context, skylink string, server string) error {
+//
+// The `markPinned` flag sets the `unpin` field of the skylink to false when
+// raised but it doesn't set it to false when not raised. The reason for that is
+// that it accommodates a specific use case - adding a server to the list of
+// pinners of a given skylink will set the unpin field to false is we are doing
+// that because we know that a user is pinning it but not so if we are running
+// a server sweep and documenting which skylinks are pinned by this server.
+func (db *DB) SkylinkServerAdd(ctx context.Context, skylink string, server string, markPinned bool) error {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return ErrInvalidSkylink
 	}
 	filter := bson.M{"skylink": sl}
-	update := bson.M{"$addToSet": bson.M{"servers": server}}
+	var update bson.M
+	if markPinned {
+		update = bson.M{
+			"$addToSet": bson.M{"servers": server},
+			"$set":      bson.M{"unpin": false},
+		}
+	} else {
+		update = bson.M{"$addToSet": bson.M{"servers": server}}
+	}
 	opts := options.Update().SetUpsert(true)
 	_, err = db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err

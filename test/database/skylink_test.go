@@ -63,7 +63,7 @@ func TestSkylink(t *testing.T) {
 
 	// Add a new server to the list.
 	server := "new server"
-	err = db.SkylinkServerAdd(ctx, sl, server)
+	err = db.SkylinkServerAdd(ctx, sl, server, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,6 +102,37 @@ func TestSkylink(t *testing.T) {
 	}
 	// Mark the file as pinned again.
 	err = db.SkylinkMarkPinned(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = db.SkylinkFetch(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Unpin {
+		t.Fatal("Expected the skylink to not be unpinned.")
+	}
+	// Mark the skylink as unpinned again.
+	err = db.SkylinkMarkUnpinned(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add a server to it with the `markUnpinned` set to false.
+	// Expect the skylink to remain unpinned.
+	err = db.SkylinkServerAdd(ctx, sl, "new server pin false", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = db.SkylinkFetch(ctx, sl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.Unpin {
+		t.Fatal("Expected the skylink to be unpinned.")
+	}
+	// Add a server to the skylink with `markUnpinned` set to true.
+	// Expect the skylink to not be unpinned.
+	err = db.SkylinkServerAdd(ctx, sl, "new server pin true", true)
 	if err != nil {
 		t.Fatal(err)
 	}

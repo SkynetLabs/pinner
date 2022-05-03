@@ -44,24 +44,10 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	// If the skylink already exists, add this server to its list of servers.
+	// If the skylink already exists, add this server to its list of servers and
+	// mark the skylink as not unpinned.
 	if errors.Contains(err, database.ErrSkylinkExists) {
-		var s database.Skylink
-		s, err = api.staticDB.SkylinkFetch(req.Context(), body.Skylink)
-		if err != nil {
-			api.WriteError(w, err, http.StatusInternalServerError)
-			return
-		}
-		// If the skylink is marked as unpinned we mark is as pinned again
-		// because a user just pinned it.
-		if s.Unpin {
-			err = api.staticDB.SkylinkMarkPinned(req.Context(), body.Skylink)
-			if err != nil {
-				api.WriteError(w, err, http.StatusInternalServerError)
-				return
-			}
-		}
-		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, api.staticServerName)
+		err = api.staticDB.SkylinkServerAdd(req.Context(), body.Skylink, api.staticServerName, true)
 	}
 	if err != nil {
 		api.WriteError(w, err, http.StatusInternalServerError)
