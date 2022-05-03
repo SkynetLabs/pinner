@@ -43,9 +43,9 @@ type (
 	}
 )
 
-// SkylinkCreate inserts a new skylink into the DB. Returns an error if it
+// CreateSkylink inserts a new skylink into the DB. Returns an error if it
 // already exists.
-func (db *DB) SkylinkCreate(ctx context.Context, skylink string, server string) (Skylink, error) {
+func (db *DB) CreateSkylink(ctx context.Context, skylink string, server string) (Skylink, error) {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return Skylink{}, ErrInvalidSkylink
@@ -68,8 +68,8 @@ func (db *DB) SkylinkCreate(ctx context.Context, skylink string, server string) 
 	return s, nil
 }
 
-// SkylinkFetch fetches a skylink from the DB.
-func (db *DB) SkylinkFetch(ctx context.Context, skylink string) (Skylink, error) {
+// FindSkylink fetches a skylink from the DB.
+func (db *DB) FindSkylink(ctx context.Context, skylink string) (Skylink, error) {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return Skylink{}, ErrInvalidSkylink
@@ -89,9 +89,9 @@ func (db *DB) SkylinkFetch(ctx context.Context, skylink string) (Skylink, error)
 	return s, nil
 }
 
-// SkylinkMarkPinned marks a skylink as pinned (or no longer unpinned), meaning
+// MarkPinned marks a skylink as pinned (or no longer unpinned), meaning
 // that Pinner should make sure it's pinned by the minimum number of servers.
-func (db *DB) SkylinkMarkPinned(ctx context.Context, skylink string) error {
+func (db *DB) MarkPinned(ctx context.Context, skylink string) error {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return ErrInvalidSkylink
@@ -103,9 +103,9 @@ func (db *DB) SkylinkMarkPinned(ctx context.Context, skylink string) error {
 	return err
 }
 
-// SkylinkMarkUnpinned marks a skylink as unpinned, meaning that all servers
+// MarkUnpinned marks a skylink as unpinned, meaning that all servers
 // should stop pinning it.
-func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink string) error {
+func (db *DB) MarkUnpinned(ctx context.Context, skylink string) error {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return ErrInvalidSkylink
@@ -117,7 +117,7 @@ func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink string) error {
 	return err
 }
 
-// SkylinkServerAdd adds a new server to the list of servers known to be pinning
+// AddServerForSkylink adds a new server to the list of servers known to be pinning
 // this skylink. If the skylink does not already exist in the database it will
 // be inserted. This operation is idempotent.
 //
@@ -127,7 +127,7 @@ func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink string) error {
 // pinners of a given skylink will set the unpin field to false is we are doing
 // that because we know that a user is pinning it but not so if we are running
 // a server sweep and documenting which skylinks are pinned by this server.
-func (db *DB) SkylinkServerAdd(ctx context.Context, skylink string, server string, markPinned bool) error {
+func (db *DB) AddServerForSkylink(ctx context.Context, skylink string, server string, markPinned bool) error {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return ErrInvalidSkylink
@@ -147,10 +147,10 @@ func (db *DB) SkylinkServerAdd(ctx context.Context, skylink string, server strin
 	return err
 }
 
-// SkylinkServerRemove removes a server to the list of servers known to be
+// RemoveServerFromSkylink removes a server to the list of servers known to be
 // pinning this skylink. If the skylink does not exist in the database it will
 // not be inserted.
-func (db *DB) SkylinkServerRemove(ctx context.Context, skylink string, server string) error {
+func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink string, server string) error {
 	sl, err := CanonicalSkylink(skylink)
 	if err != nil {
 		return ErrInvalidSkylink
