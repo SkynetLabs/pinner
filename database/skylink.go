@@ -43,9 +43,9 @@ type (
 	}
 )
 
-// SkylinkCreate inserts a new skylink into the DB. Returns an error if it
+// CreateSkylink inserts a new skylink into the DB. Returns an error if it
 // already exists.
-func (db *DB) SkylinkCreate(ctx context.Context, skylink skymodules.Skylink, server string) (Skylink, error) {
+func (db *DB) CreateSkylink(ctx context.Context, skylink skymodules.Skylink, server string) (Skylink, error) {
 	if server == "" {
 		return Skylink{}, errors.New("invalid server name")
 	}
@@ -64,8 +64,8 @@ func (db *DB) SkylinkCreate(ctx context.Context, skylink skymodules.Skylink, ser
 	return s, nil
 }
 
-// SkylinkFetch fetches a skylink from the DB.
-func (db *DB) SkylinkFetch(ctx context.Context, skylink skymodules.Skylink) (Skylink, error) {
+// FindSkylink fetches a skylink from the DB.
+func (db *DB) FindSkylink(ctx context.Context, skylink skymodules.Skylink) (Skylink, error) {
 	sr := db.staticDB.Collection(collSkylinks).FindOne(ctx, bson.M{"skylink": skylink.String()})
 	if sr.Err() == mongo.ErrNoDocuments {
 		return Skylink{}, ErrSkylinkNoExist
@@ -81,9 +81,9 @@ func (db *DB) SkylinkFetch(ctx context.Context, skylink skymodules.Skylink) (Sky
 	return s, nil
 }
 
-// SkylinkMarkPinned marks a skylink as pinned (or no longer unpinned), meaning
+// MarkPinned marks a skylink as pinned (or no longer unpinned), meaning
 // that Pinner should make sure it's pinned by the minimum number of servers.
-func (db *DB) SkylinkMarkPinned(ctx context.Context, skylink skymodules.Skylink) error {
+func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error {
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"unpin": false}}
 	opts := options.Update().SetUpsert(true)
@@ -91,9 +91,9 @@ func (db *DB) SkylinkMarkPinned(ctx context.Context, skylink skymodules.Skylink)
 	return err
 }
 
-// SkylinkMarkUnpinned marks a skylink as unpinned, meaning that all servers
+// MarkUnpinned marks a skylink as unpinned, meaning that all servers
 // should stop pinning it.
-func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink skymodules.Skylink) error {
+func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) error {
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"unpin": true}}
 	opts := options.Update().SetUpsert(true)
@@ -101,21 +101,36 @@ func (db *DB) SkylinkMarkUnpinned(ctx context.Context, skylink skymodules.Skylin
 	return err
 }
 
-// SkylinkServerAdd adds a new server to the list of servers known to be pinning
+// AddServerForSkylink adds a new server to the list of servers known to be pinning
 // this skylink. If the skylink does not already exist in the database it will
 // be inserted. This operation is idempotent.
-func (db *DB) SkylinkServerAdd(ctx context.Context, skylink skymodules.Skylink, server string) error {
+//
+// The `markPinned` flag sets the `unpin` field of the skylink to false when
+// raised but it doesn't set it to false when not raised. The reason for that is
+// that it accommodates a specific use case - adding a server to the list of
+// pinners of a given skylink will set the unpin field to false is we are doing
+// that because we know that a user is pinning it but not so if we are running
+// a server sweep and documenting which skylinks are pinned by this server.
+func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylink, server string, markPinned bool) error {
 	filter := bson.M{"skylink": skylink.String()}
-	update := bson.M{"$addToSet": bson.M{"servers": server}}
+	var update bson.M
+	if markPinned {
+		update = bson.M{
+			"$addToSet": bson.M{"servers": server},
+			"$set":      bson.M{"unpin": false},
+		}
+	} else {
+		update = bson.M{"$addToSet": bson.M{"servers": server}}
+	}
 	opts := options.Update().SetUpsert(true)
 	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err
 }
 
-// SkylinkServerRemove removes a server to the list of servers known to be
+// RemoveServerFromSkylink removes a server to the list of servers known to be
 // pinning this skylink. If the skylink does not exist in the database it will
 // not be inserted.
-func (db *DB) SkylinkServerRemove(ctx context.Context, skylink skymodules.Skylink, server string) error {
+func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
 	filter := bson.M{
 		"skylink": skylink.String(),
 		"servers": server,
@@ -125,7 +140,7 @@ func (db *DB) SkylinkServerRemove(ctx context.Context, skylink skymodules.Skylin
 	return err
 }
 
-// SkylinkFetchAndLockUnderpinned fetches and locks a single underpinned skylink
+// FetchAndLockUnderpinned fetches and locks a single underpinned skylink
 // from the database. The method selects only skylinks which are not pinned by
 // the given server.
 //
@@ -138,11 +153,11 @@ func (db *DB) SkylinkServerRemove(ctx context.Context, skylink skymodules.Skylin
 //         { "lock_expires" : { "$lt": new Date() }}
 //     ]
 // })
-func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string, minPinners int) (skymodules.Skylink, error) {
+func (db *DB) FetchAndLockUnderpinned(ctx context.Context, server string, minPinners int) (skymodules.Skylink, error) {
 	// First try to fetch a skylink which is locked by the current server. This
 	// is our mechanism for proactively recovering from files being left locked
 	// after a server crash.
-	sl, err := db.skylinkFetchLocked(ctx, server)
+	sl, err := db.fetchLockedSkylink(ctx, server)
 	if err == nil {
 		return sl, nil
 	}
@@ -183,9 +198,9 @@ func (db *DB) SkylinkFetchAndLockUnderpinned(ctx context.Context, server string,
 	return SkylinkFromString(result.Skylink)
 }
 
-// skylinkFetchLocked fetches a skylink that's locked by the current server, if
+// fetchLockedSkylink fetches a skylink that's locked by the current server, if
 // one exists.
-func (db *DB) skylinkFetchLocked(ctx context.Context, server string) (skymodules.Skylink, error) {
+func (db *DB) fetchLockedSkylink(ctx context.Context, server string) (skymodules.Skylink, error) {
 	filter := bson.M{
 		"locked_by":    server,
 		"lock_expires": bson.M{"$gt": time.Now().UTC()},
@@ -205,9 +220,9 @@ func (db *DB) skylinkFetchLocked(ctx context.Context, server string) (skymodules
 	return SkylinkFromString(result.Skylink)
 }
 
-// SkylinkUnlock removes the lock on the skylink put while we're trying to pin
+// UnlockSkylink removes the lock on the skylink put while we're trying to pin
 // it to a new server.
-func (db *DB) SkylinkUnlock(ctx context.Context, skylink skymodules.Skylink, server string) error {
+func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
 	filter := bson.M{
 		"skylink":   skylink.String(),
 		"locked_by": server,

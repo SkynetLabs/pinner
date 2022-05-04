@@ -80,7 +80,7 @@ func testHandlerPinPOST(t *testing.T, tt *test.Tester) {
 
 	// Mark the skylink as unpinned and pin it again.
 	// Expect it to no longer be unpinned.
-	err = tt.DB.SkylinkMarkUnpinned(tt.Ctx, sl)
+	err = tt.DB.MarkUnpinned(tt.Ctx, sl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func testHandlerPinPOST(t *testing.T, tt *test.Tester) {
 	if err != nil || status != http.StatusNoContent {
 		t.Fatal(status, err)
 	}
-	slNew, err := tt.DB.SkylinkFetch(tt.Ctx, sl)
+	slNew, err := tt.DB.FindSkylink(tt.Ctx, sl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func testHandlerUnpinPOST(t *testing.T, at *test.Tester) {
 		t.Fatal(status, err)
 	}
 	// Make sure the skylink is marked as unpinned.
-	slNew, err := at.DB.SkylinkFetch(at.Ctx, sl)
+	slNew, err := at.DB.FindSkylink(at.Ctx, sl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func testHandlerUnpinPOST(t *testing.T, at *test.Tester) {
 		t.Fatal(status, err)
 	}
 	// Make sure the skylink is marked as unpinned.
-	sl2New, err := at.DB.SkylinkFetch(at.Ctx, sl)
+	sl2New, err := at.DB.FindSkylink(at.Ctx, sl)
 	if err != nil {
 		t.Fatal(err)
 	}

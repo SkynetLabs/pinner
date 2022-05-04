@@ -46,7 +46,7 @@ func TestScanner(t *testing.T) {
 	// Add a skylink from the name of a different server.
 	sl := test.RandomSkylink()
 	otherServer := "other server"
-	_, err = db.SkylinkCreate(ctx, sl, otherServer)
+	_, err = db.CreateSkylink(ctx, sl, otherServer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestScanner(t *testing.T) {
 		t.Fatal("We didn't expect skyd to be pinning this.")
 	}
 	// Remove the other server, making the file underpinned.
-	err = db.SkylinkServerRemove(ctx, sl, otherServer)
+	err = db.RemoveServerFromSkylink(ctx, sl, otherServer)
 	if err != nil {
 		t.Fatal(err)
 	}

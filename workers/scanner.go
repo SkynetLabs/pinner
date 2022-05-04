@@ -103,7 +103,7 @@ func (s *Scanner) threadedScanAndPin() {
 	for {
 		// This function allows us to unlock the skylink in a defer.
 		func() {
-			sl, err := s.staticDB.SkylinkFetchAndLockUnderpinned(context.TODO(), s.staticCfg.ServerName, s.staticCfg.MinNumberOfPinners)
+			sl, err := s.staticDB.FetchAndLockUnderpinned(context.TODO(), s.staticCfg.ServerName, s.staticCfg.MinNumberOfPinners)
 			if errors.Contains(err, database.ErrSkylinkNoExist) {
 				// No more underpinned skylinks pinnable by this server.
 				return
@@ -113,7 +113,7 @@ func (s *Scanner) threadedScanAndPin() {
 				return
 			}
 			defer func() {
-				err = s.staticDB.SkylinkUnlock(context.TODO(), sl, s.staticCfg.ServerName)
+				err = s.staticDB.UnlockSkylink(context.TODO(), sl, s.staticCfg.ServerName)
 				if err != nil {
 					s.staticLogger.Debug(errors.AddContext(err, "failed to unlock skylink after trying to pin it"))
 				}
