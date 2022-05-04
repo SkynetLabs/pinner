@@ -110,8 +110,7 @@ func ensureDBSchema(ctx context.Context, db *mongo.Database, log *logrus.Logger)
 			return err
 		}
 		iv := coll.Indexes()
-		var names []string
-		names, err = iv.CreateMany(ctx, models)
+		names, err := iv.CreateMany(ctx, models)
 		if err != nil {
 			return errors.AddContext(err, "failed to create indexes")
 		}

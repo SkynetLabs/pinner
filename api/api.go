@@ -15,9 +15,10 @@ import (
 type (
 	// API is the central struct which gives us access to all subsystems.
 	API struct {
-		staticDB     *database.DB
-		staticRouter *httprouter.Router
-		staticLogger *logrus.Logger
+		staticServerName string
+		staticDB         *database.DB
+		staticRouter     *httprouter.Router
+		staticLogger     *logrus.Logger
 	}
 
 	// errorWrap is a helper type for converting an `error` struct to JSON.
@@ -27,7 +28,7 @@ type (
 )
 
 // New returns a new initialised API.
-func New(db *database.DB, logger *logrus.Logger) (*API, error) {
+func New(serverName string, db *database.DB, logger *logrus.Logger) (*API, error) {
 	if db == nil {
 		return nil, errors.New("no DB provided")
 	}
@@ -37,13 +38,14 @@ func New(db *database.DB, logger *logrus.Logger) (*API, error) {
 	router := httprouter.New()
 	router.RedirectTrailingSlash = true
 
-	api := &API{
-		staticDB:     db,
-		staticRouter: router,
-		staticLogger: logger,
+	apiInstance := &API{
+		staticServerName: serverName,
+		staticDB:         db,
+		staticRouter:     router,
+		staticLogger:     logger,
 	}
-	api.buildHTTPRoutes()
-	return api, nil
+	apiInstance.buildHTTPRoutes()
+	return apiInstance, nil
 }
 
 // ServeHTTP implements the http.Handler interface.

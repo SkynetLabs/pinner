@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	// TestServerName is what we'll use for ServerName during testing. We want
+	// ServerName is what we'll use for ServerName during testing. We want
 	// to have it in a separate variable, so we can set it in different tests
 	// without worrying about them choosing different names.
-	TestServerName = "test.server.name"
+	ServerName = "test.server.name"
 	// confMu is a mutex which ensures that no two threads are
 	// going to mutate the configuration environment variables at the same time.
 	// This is done, so we can always restore the environment to the state
@@ -66,10 +66,10 @@ func DBTestCredentials() database.DBCredentials {
 	}
 }
 
-// EnsureTestConfiguration temporarily replaces environment variables with their
+// LoadTestConfig temporarily replaces environment variables with their
 // test values, loads the configuration with these test values and then restores
 // the original environment.
-func EnsureTestConfiguration() error {
+func LoadTestConfig() (conf.Config, error) {
 	confMu.Lock()
 	defer confMu.Unlock()
 	envVars := []string{
@@ -78,6 +78,7 @@ func EnsureTestConfiguration() error {
 		"SKYNET_DB_PASS",
 		"SKYNET_DB_HOST",
 		"SKYNET_DB_PORT",
+		"SIA_API_PASSWORD",
 	}
 	// Store the original values.
 	originals := make(map[string]string)
@@ -100,15 +101,16 @@ func EnsureTestConfiguration() error {
 	}()
 	// Set the test values we need.
 	dbcr := DBTestCredentials()
-	e1 := os.Setenv("SERVER_DOMAIN", TestServerName)
+	e1 := os.Setenv("SERVER_DOMAIN", ServerName)
 	e2 := os.Setenv("SKYNET_DB_USER", dbcr.User)
 	e3 := os.Setenv("SKYNET_DB_PASS", dbcr.Password)
 	e4 := os.Setenv("SKYNET_DB_HOST", dbcr.Host)
 	e5 := os.Setenv("SKYNET_DB_PORT", dbcr.Port)
-	if err := errors.Compose(e1, e2, e3, e4, e5); err != nil {
-		return err
+	e6 := os.Setenv("SIA_API_PASSWORD", "testSiaApiPassword")
+	if err := errors.Compose(e1, e2, e3, e4, e5, e6); err != nil {
+		return conf.Config{}, err
 	}
-	return conf.LoadConf()
+	return conf.LoadConfig()
 }
 
 // RandomSkylink generates a random skylink

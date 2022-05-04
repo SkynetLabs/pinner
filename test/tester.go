@@ -52,6 +52,11 @@ func NewTester(dbName string) (*Tester, error) {
 	ctx := context.Background()
 	logger := NewDiscardLogger()
 
+	cfg, err := LoadTestConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	// Connect to the database.
 	db, err := NewDatabase(ctx, dbName)
 	if err != nil {
@@ -61,7 +66,7 @@ func NewTester(dbName string) (*Tester, error) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 
 	// The server API encapsulates all the modules together.
-	server, err := api.New(db, logger)
+	server, err := api.New(cfg.ServerName, db, logger)
 	if err != nil {
 		cancel()
 		return nil, errors.AddContext(err, "failed to build the API")
@@ -257,5 +262,18 @@ func (t *Tester) PinPOST(sl string) (int, error) {
 		return http.StatusBadRequest, errors.AddContext(err, "unable to marshal request body")
 	}
 	r, err := t.Request(http.MethodPost, "/pin", nil, body, nil, nil)
+	return r.StatusCode, err
+}
+
+// UnpinPOST tells pinner that no users are pinning this skylink and it should
+// be unpinned by all servers.
+func (t *Tester) UnpinPOST(sl string) (int, error) {
+	body, err := json.Marshal(api.SkylinkRequest{
+		Skylink: sl,
+	})
+	if err != nil {
+		return http.StatusBadRequest, errors.AddContext(err, "unable to marshal request body")
+	}
+	r, err := t.Request(http.MethodPost, "/unpin", nil, body, nil, nil)
 	return r.StatusCode, err
 }

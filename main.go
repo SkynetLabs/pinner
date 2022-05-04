@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// Load the configuration from the environment and the local .env file.
-	err := conf.LoadConf()
+	cfg, err := conf.LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,29 +23,24 @@ func main() {
 	// wind themselves down.
 	ctx := context.Background()
 	logger := logrus.New()
-	logLevel, err := logrus.ParseLevel(conf.Conf().LogLevel)
+	logLevel, err := logrus.ParseLevel(cfg.LogLevel)
 	if err != nil {
-		log.Fatal(errors.AddContext(err, "invalid log level: "+conf.Conf().LogLevel))
+		log.Fatal(errors.AddContext(err, "invalid log level: "+cfg.LogLevel))
 	}
 	logger.SetLevel(logLevel)
 
 	// Initialised the database connection.
-	dbCreds := database.DBCredentials{
-		User:     conf.Conf().DBUser,
-		Password: conf.Conf().DBPassword,
-		Host:     conf.Conf().DBHost,
-		Port:     conf.Conf().DBPort,
-	}
-	db, err := database.New(ctx, dbCreds, logger)
+	db, err := database.New(ctx, cfg.DBCredentials, logger)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, database.ErrCtxFailedToConnect))
 	}
 
 	// Initialise the server.
-	server, err := api.New(db, logger)
+	server, err := api.New(cfg.ServerName, db, logger)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
 
-	log.Fatal(server.ListenAndServe(4000))
+	err = server.ListenAndServe(4000)
+	log.Fatal(err)
 }
