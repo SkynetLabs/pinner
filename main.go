@@ -39,12 +39,12 @@ func main() {
 	}
 
 	// A global thread group that ensures all subprocesses are gracefully
-	// stopped at shutdown.
+	// stopped on shutdown.
 	var tg threadgroup.ThreadGroup
 
 	// Start the background scanner.
-	skydClient := skyd.NewClient(cfg)
-	scanner := workers.NewScanner(cfg, db, logger, skydClient, &tg)
+	skydClient := skyd.NewClient(cfg.SiaAPIHost, cfg.SiaAPIPort, cfg.SiaAPIPassword)
+	scanner := workers.NewScanner(db, logger, cfg.MinNumberOfPinners, cfg.ServerName, skydClient, &tg)
 	err = scanner.Start()
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to start Scanner"))
@@ -57,6 +57,5 @@ func main() {
 	}
 
 	err = server.ListenAndServe(4000)
-	errStopping := tg.Stop()
-	log.Fatal(errors.Compose(err, errStopping))
+	log.Fatal(errors.Compose(err, tg.Stop()))
 }

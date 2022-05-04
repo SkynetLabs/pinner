@@ -140,12 +140,13 @@ func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Sk
 	return err
 }
 
-// FetchAndLockUnderpinned fetches and locks a single underpinned skylink
+// FindAndLockUnderpinned fetches and locks a single underpinned skylink
 // from the database. The method selects only skylinks which are not pinned by
 // the given server.
 //
 // The MongoDB query is this:
 // db.getCollection('skylinks').find({
+//     "unpin": false,
 //     "$expr": { "$lt": [{ "$size": "$servers" }, 2 ]},
 //     "servers": { "$nin": [ "ro-tex.siasky.ivo.NOPE" ]},
 //     "$or": [
@@ -153,11 +154,11 @@ func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Sk
 //         { "lock_expires" : { "$lt": new Date() }}
 //     ]
 // })
-func (db *DB) FetchAndLockUnderpinned(ctx context.Context, server string, minPinners int) (skymodules.Skylink, error) {
+func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinners int) (skymodules.Skylink, error) {
 	// First try to fetch a skylink which is locked by the current server. This
 	// is our mechanism for proactively recovering from files being left locked
 	// after a server crash.
-	sl, err := db.fetchLockedSkylink(ctx, server)
+	sl, err := db.findLockedSkylink(ctx, server)
 	if err == nil {
 		return sl, nil
 	}
@@ -171,7 +172,7 @@ func (db *DB) FetchAndLockUnderpinned(ctx context.Context, server string, minPin
 		// Unlocked.
 		"$or": bson.A{
 			bson.M{"lock_expires": bson.M{"$exists": false}},
-			bson.M{"lock_expires": bson.M{"$lt": time.Now().UTC()}},
+			bson.M{"lock_expires": bson.M{"$lt": time.Now().UTC().Truncate(time.Millisecond)}},
 		},
 	}
 	update := bson.M{
@@ -198,12 +199,12 @@ func (db *DB) FetchAndLockUnderpinned(ctx context.Context, server string, minPin
 	return SkylinkFromString(result.Skylink)
 }
 
-// fetchLockedSkylink fetches a skylink that's locked by the current server, if
+// findLockedSkylink fetches a skylink that's locked by the current server, if
 // one exists.
-func (db *DB) fetchLockedSkylink(ctx context.Context, server string) (skymodules.Skylink, error) {
+func (db *DB) findLockedSkylink(ctx context.Context, server string) (skymodules.Skylink, error) {
 	filter := bson.M{
 		"locked_by":    server,
-		"lock_expires": bson.M{"$gt": time.Now().UTC()},
+		"lock_expires": bson.M{"$gt": time.Now().UTC().Truncate(time.Millisecond)},
 		"unpin":        false,
 	}
 	sr := db.staticDB.Collection(collSkylinks).FindOne(ctx, filter)

@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/skynetlabs/pinner/conf"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
@@ -43,10 +42,10 @@ type (
 )
 
 // NewClient creates a new skyd client.
-func NewClient(cfg conf.Config) *Client {
+func NewClient(host, port, password string) *Client {
 	opts := client.Options{
-		Address:       fmt.Sprintf("%s:%s", cfg.SiaAPIHost, cfg.SiaAPIPort),
-		Password:      cfg.SiaAPIPassword,
+		Address:       fmt.Sprintf("%s:%s", host, port),
+		Password:      password,
 		UserAgent:     "Sia-Agent",
 		CheckRedirect: nil,
 	}
