@@ -44,7 +44,9 @@ var (
 	// SleepBetweenScans defines how often we'll scan the DB for underpinned
 	// skylinks.
 	SleepBetweenScans = build.Select(build.Var{
-		Standard: 24 * time.Hour,
+		// In production we want to use a prime number of hours, so we can
+		// de-sync the scan and the sweeps.
+		Standard: 19 * time.Hour,
 		Dev:      10 * time.Second,
 		Testing:  100 * time.Millisecond,
 	}).(time.Duration)
@@ -96,20 +98,23 @@ func (s *Scanner) threadedScanAndPin() {
 
 	// Main execution loop, goes on forever while the service is running.
 	for {
-		// Loop over all underpinned skylinks and pin them.
-		for s.findAndPinOneUnderpinnedSkylink() {
-			// Sleep for a bit after pinning before continuing with the next
-			// skylink.
-			select {
-			case <-time.After(SleepBetweenPins):
-			case <-s.staticTG.StopChan():
-				return
-			}
-		}
-
+		s.pinUnderpinnedSkylinks()
 		// Sleep between database scans.
 		select {
 		case <-time.After(SleepBetweenScans):
+		case <-s.staticTG.StopChan():
+			return
+		}
+	}
+}
+
+// pinUnderpinnedSkylinks loops over all underpinned skylinks and pin them.
+func (s *Scanner) pinUnderpinnedSkylinks() {
+	for s.findAndPinOneUnderpinnedSkylink() {
+		// Sleep for a bit after pinning before continuing with the next
+		// skylink.
+		select {
+		case <-time.After(SleepBetweenPins):
 		case <-s.staticTG.StopChan():
 			return
 		}
