@@ -9,7 +9,6 @@ import (
 	"github.com/skynetlabs/pinner/test/mocks"
 	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/threadgroup"
 )
 
 // TestScanner ensures that Scanner does its job.
@@ -20,8 +19,7 @@ func TestScanner(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	dbName := test.DBNameForTest(t.Name())
-	db, err := test.NewDatabase(ctx, dbName)
+	db, err := test.NewDatabase(ctx, t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,10 +29,9 @@ func TestScanner(t *testing.T) {
 		t.Fatal(err)
 	}
 	skydcm := &mocks.SkydClientMock{}
-	var tg threadgroup.ThreadGroup
-	scanner := workers.NewScanner(db, test.NewDiscardLogger(), cfg.MinNumberOfPinners, cfg.ServerName, skydcm, &tg)
+	scanner := workers.NewScanner(db, test.NewDiscardLogger(), cfg.MinPinners, cfg.ServerName, skydcm)
 	defer func() {
-		if e := tg.Stop(); e != nil {
+		if e := scanner.Close(); e != nil {
 			t.Error(errors.AddContext(e, "failed to close threadgroup"))
 		}
 	}()

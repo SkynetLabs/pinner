@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/skynetlabs/pinner/conf"
@@ -48,12 +47,6 @@ func (w ResponseWriter) Write(b []byte) (int, error) {
 // WriteHeader implementation.
 func (w ResponseWriter) WriteHeader(statusCode int) {
 	w.Status = statusCode
-}
-
-// DBNameForTest sanitizes the input string, so it can be used as an email or
-// sub.
-func DBNameForTest(s string) string {
-	return strings.ReplaceAll(s, "/", "_")
 }
 
 // DBTestCredentials sets the environment variables to what we have defined in Makefile.

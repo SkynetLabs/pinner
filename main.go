@@ -11,7 +11,6 @@ import (
 	"github.com/skynetlabs/pinner/skyd"
 	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/threadgroup"
 )
 
 func main() {
@@ -38,13 +37,9 @@ func main() {
 		log.Fatal(errors.AddContext(err, database.ErrCtxFailedToConnect))
 	}
 
-	// A global thread group that ensures all subprocesses are gracefully
-	// stopped on shutdown.
-	var tg threadgroup.ThreadGroup
-
 	// Start the background scanner.
 	skydClient := skyd.NewClient(cfg.SiaAPIHost, cfg.SiaAPIPort, cfg.SiaAPIPassword)
-	scanner := workers.NewScanner(db, logger, cfg.MinNumberOfPinners, cfg.ServerName, skydClient, &tg)
+	scanner := workers.NewScanner(db, logger, cfg.MinPinners, cfg.ServerName, skydClient)
 	err = scanner.Start()
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to start Scanner"))
@@ -57,5 +52,5 @@ func main() {
 	}
 
 	err = server.ListenAndServe(4000)
-	log.Fatal(errors.Compose(err, tg.Stop()))
+	log.Fatal(errors.Compose(err, scanner.Close()))
 }

@@ -24,8 +24,7 @@ func TestHandlers(t *testing.T) {
 	}
 	t.Parallel()
 
-	dbName := test.DBNameForTest(t.Name())
-	tt, err := test.NewTester(dbName)
+	tt, err := test.NewTester(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

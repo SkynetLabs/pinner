@@ -58,25 +58,30 @@ type (
 	// being pinned by the local server already), Scanner pins it to the local
 	// skyd.
 	Scanner struct {
-		staticDB            *database.DB
-		staticLogger        *logrus.Logger
-		staticMinNumPinners int
-		staticServerName    string
-		staticSkydClient    skyd.Client
-		staticTG            *threadgroup.ThreadGroup
+		staticDB         *database.DB
+		staticLogger     *logrus.Logger
+		staticMinPinners int
+		staticServerName string
+		staticSkydClient skyd.Client
+		staticTG         *threadgroup.ThreadGroup
 	}
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(db *database.DB, logger *logrus.Logger, minNumPinners int, serverName string, skydClient skyd.Client, tg *threadgroup.ThreadGroup) *Scanner {
+func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, skydClient skyd.Client) *Scanner {
 	return &Scanner{
-		staticDB:            db,
-		staticLogger:        logger,
-		staticMinNumPinners: minNumPinners,
-		staticServerName:    serverName,
-		staticSkydClient:    skydClient,
-		staticTG:            tg,
+		staticDB:         db,
+		staticLogger:     logger,
+		staticMinPinners: minPinners,
+		staticServerName: serverName,
+		staticSkydClient: skydClient,
+		staticTG:         &threadgroup.ThreadGroup{},
 	}
+}
+
+// Close stops the background worker thread.
+func (s *Scanner) Close() error {
+	return s.staticTG.Stop()
 }
 
 // Start launches the background worker thread that scans the DB for underpinned
@@ -126,7 +131,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // skylink, it pins it to the local skyd. The method returns true until it finds
 // no further skylinks to process.
 func (s *Scanner) findAndPinOneUnderpinnedSkylink() bool {
-	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinNumPinners)
+	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
 	if errors.Contains(err, database.ErrSkylinkNoExist) {
 		// No more underpinned skylinks pinnable by this server.
 		return false

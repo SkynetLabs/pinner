@@ -11,12 +11,12 @@ import (
 // Default configuration values.
 // For individual descriptions see Config.
 const (
-	defaultAccountsHost       = "10.10.10.70"
-	defaultAccountsPort       = "3000"
-	defaultLogLevel           = "info"
-	defaultSiaAPIHost         = "10.10.10.10"
-	defaultSiaAPIPort         = "9980"
-	defaultMinNumberOfPinners = 1
+	defaultAccountsHost = "10.10.10.70"
+	defaultAccountsPort = "3000"
+	defaultLogLevel     = "info"
+	defaultSiaAPIHost   = "10.10.10.10"
+	defaultSiaAPIPort   = "9980"
+	defaultMinPinners   = 1
 )
 
 type (
@@ -31,10 +31,10 @@ type (
 		DBCredentials database.DBCredentials
 		// LogLevel defines the logging level of the entire service.
 		LogLevel string
-		// MinNumberOfPinners defines the minimum number of pinning servers which a
-		// 	skylink needs in order to not be considered underpinned. Anything below
-		// 	this value requires more servers to pin the skylink.
-		MinNumberOfPinners int
+		// MinPinners defines the minimum number of pinning servers
+		// which a skylink needs in order to not be considered underpinned.
+		// Anything below this value requires more servers to pin the skylink.
+		MinPinners int
 		// ServerName holds the name of the current server. This name will be
 		// used for identifying which servers are pinning a given skylink.
 		ServerName string
@@ -56,13 +56,13 @@ func LoadConfig() (Config, error) {
 
 	// Start with the default values.
 	cfg := Config{
-		AccountsHost:       defaultAccountsHost,
-		AccountsPort:       defaultAccountsPort,
-		DBCredentials:      database.DBCredentials{},
-		LogLevel:           defaultLogLevel,
-		MinNumberOfPinners: defaultMinNumberOfPinners,
-		SiaAPIHost:         defaultSiaAPIHost,
-		SiaAPIPort:         defaultSiaAPIPort,
+		AccountsHost:  defaultAccountsHost,
+		AccountsPort:  defaultAccountsPort,
+		DBCredentials: database.DBCredentials{},
+		LogLevel:      defaultLogLevel,
+		MinPinners:    defaultMinPinners,
+		SiaAPIHost:    defaultSiaAPIHost,
+		SiaAPIPort:    defaultSiaAPIPort,
 	}
 
 	var ok bool

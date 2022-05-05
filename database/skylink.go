@@ -31,15 +31,15 @@ var (
 
 type (
 	// Skylink represents a skylink object in the DB.
-	// The Unpin field instructs all servers, currently pinning this skylink,
-	// that there are no users pinning and the servers should unpin it as well.
 	Skylink struct {
-		ID          primitive.ObjectID `bson:"_id,omitempty"`
-		Skylink     string             `bson:"skylink"`
-		Servers     []string           `bson:"servers"`
-		Unpin       bool               `bson:"unpin"`
-		LockedBy    string             `bson:"locked_by"`
-		LockExpires time.Time          `bson:"lock_expires"`
+		ID      primitive.ObjectID `bson:"_id,omitempty"`
+		Skylink string             `bson:"skylink"`
+		Servers []string           `bson:"servers"`
+		// Unpin informs all servers that there are no users pinning this
+		// skylink and they should stop pinning it as well.
+		Unpin       bool      `bson:"unpin"`
+		LockedBy    string    `bson:"locked_by"`
+		LockExpires time.Time `bson:"lock_expires"`
 	}
 )
 
