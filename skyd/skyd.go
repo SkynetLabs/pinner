@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/SkynetLabs/skyd/node/api/client"
+	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
@@ -19,17 +19,17 @@ var (
 )
 
 type (
-	// Client allows us to call the local skyd instance.
-	Client struct {
-		staticClient *client.Client
-	}
-	// ClientInterface describes the interface exposed by Client.
-	ClientInterface interface {
+	// Client describes the interface exposed by client.
+	Client interface {
 		Pin(skylink string) error
 		PinnedSkylinks() (skylinks []string, err error)
 		Unpin(skylink string) error
 	}
 
+	// client allows us to call the local skyd instance.
+	client struct {
+		staticClient *skydclient.Client
+	}
 	// renterDirCache is a simple cache of the renter's directory information,
 	// so we don't need to fetch that for each skylink we potentially want to
 	// pin/unpin.
@@ -41,20 +41,20 @@ type (
 )
 
 // NewClient creates a new skyd client.
-func NewClient(host, port, password string) *Client {
-	opts := client.Options{
+func NewClient(host, port, password string) *client {
+	opts := skydclient.Options{
 		Address:       fmt.Sprintf("%s:%s", host, port),
 		Password:      password,
 		UserAgent:     "Sia-Agent",
 		CheckRedirect: nil,
 	}
-	return &Client{
-		staticClient: client.New(opts),
+	return &client{
+		staticClient: skydclient.New(opts),
 	}
 }
 
 // Pin instructs the local skyd to pin the given skylink.
-func (c *Client) Pin(skylink string) error {
+func (c *client) Pin(skylink string) error {
 	pinned, err := c.isPinned(skylink)
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func (c *Client) Pin(skylink string) error {
 }
 
 // PinnedSkylinks returns the list of skylinks pinned by the local skyd.
-func (c *Client) PinnedSkylinks() (skylinks []string, err error) {
+func (c *client) PinnedSkylinks() (skylinks []string, err error) {
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	// Check whether the cache is still valid and return it if so.
@@ -104,7 +104,7 @@ func (c *Client) PinnedSkylinks() (skylinks []string, err error) {
 }
 
 // Unpin instructs the local skyd to unpin the given skylink.
-func (c *Client) Unpin(skylink string) error {
+func (c *client) Unpin(skylink string) error {
 	pinned, err := c.isPinned(skylink)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (c *Client) Unpin(skylink string) error {
 
 // isPinned checks the list of skylinks pinned by the local skyd for the given
 // skylink and returns true if it finds it.
-func (c *Client) isPinned(skylink string) (bool, error) {
+func (c *client) isPinned(skylink string) (bool, error) {
 	sls, err := c.PinnedSkylinks()
 	if err != nil {
 		return false, err

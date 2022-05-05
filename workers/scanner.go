@@ -62,13 +62,13 @@ type (
 		staticLogger        *logrus.Logger
 		staticMinNumPinners int
 		staticServerName    string
-		staticSkydClient    skyd.ClientInterface
+		staticSkydClient    skyd.Client
 		staticTG            *threadgroup.ThreadGroup
 	}
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(db *database.DB, logger *logrus.Logger, minNumPinners int, serverName string, skydClient skyd.ClientInterface, tg *threadgroup.ThreadGroup) *Scanner {
+func NewScanner(db *database.DB, logger *logrus.Logger, minNumPinners int, serverName string, skydClient skyd.Client, tg *threadgroup.ThreadGroup) *Scanner {
 	return &Scanner{
 		staticDB:            db,
 		staticLogger:        logger,
