@@ -1,9 +1,7 @@
 package conf
 
 import (
-	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/skynetlabs/pinner/database"
@@ -62,7 +60,7 @@ func LoadConfig() (Config, error) {
 		AccountsPort:       defaultAccountsPort,
 		DBCredentials:      database.DBCredentials{},
 		LogLevel:           defaultLogLevel,
-		MinNumberOfPinners: 1,
+		MinNumberOfPinners: defaultMinNumberOfPinners,
 		SiaAPIHost:         defaultSiaAPIHost,
 		SiaAPIPort:         defaultSiaAPIPort,
 	}
@@ -105,13 +103,6 @@ func LoadConfig() (Config, error) {
 	}
 	if val, ok = os.LookupEnv("API_PORT"); ok {
 		cfg.SiaAPIPort = val
-	}
-	if val, ok = os.LookupEnv("PINNER_MIN_PINNERS"); ok {
-		num, err := strconv.Atoi(val)
-		if err != nil || num < 1 {
-			return Config{}, fmt.Errorf("invalid PINNER_MIN_PINNERS value, it needs to be a natural number (an integer > 0)")
-		}
-		cfg.MinNumberOfPinners = num
 	}
 
 	return cfg, nil

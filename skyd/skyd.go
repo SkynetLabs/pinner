@@ -23,8 +23,7 @@ type (
 	Client struct {
 		staticClient *client.Client
 	}
-	// ClientInterface describes the interface exposed by Client, so we can
-	// mock it for testing.
+	// ClientInterface describes the interface exposed by Client.
 	ClientInterface interface {
 		Pin(skylink string) error
 		PinnedSkylinks() (skylinks []string, err error)
@@ -64,12 +63,8 @@ func (c *Client) Pin(skylink string) error {
 		// The skylink is already locally pinned, nothing to do.
 		return nil
 	}
-	sp, err := skymodules.NewSiaPath(skylink)
-	if err != nil {
-		return errors.AddContext(err, "failed to create siapath")
-	}
 	spp := skymodules.SkyfilePinParameters{
-		SiaPath: sp,
+		SiaPath: skymodules.RandomSiaPath(),
 	}
 	return c.staticClient.SkynetSkylinkPinPost(skylink, spp)
 }
