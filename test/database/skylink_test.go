@@ -30,10 +30,10 @@ func TestSkylink(t *testing.T) {
 
 	sl := test.RandomSkylink()
 
-	// Fetch the skylink from the DB. Expect ErrSkylinkNoExist.
+	// Fetch the skylink from the DB. Expect ErrSkylinkNotExist.
 	_, err = db.FindSkylink(ctx, sl)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNotExist, err)
 	}
 	// Create the skylink.
 	s, err := db.CreateSkylink(ctx, sl, cfg.ServerName)
@@ -165,8 +165,8 @@ func TestFindAndLock(t *testing.T) {
 
 	// Try to fetch an underpinned skylink, expect none to be found.
 	_, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 	// Create a new skylink.
 	_, err = db.CreateSkylink(ctx, sl, cfg.ServerName)
@@ -175,8 +175,8 @@ func TestFindAndLock(t *testing.T) {
 	}
 	// Try to fetch an underpinned skylink, expect none to be found.
 	_, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 	// Make sure it's pinned by fewer than the minimum number of servers.
 	err = db.RemoveServerFromSkylink(ctx, sl, cfg.ServerName)
@@ -195,8 +195,8 @@ func TestFindAndLock(t *testing.T) {
 	// Expect to find none because the one we got before is now locked and
 	// shouldn't be returned.
 	_, err = db.FindAndLockUnderpinned(ctx, "different server", cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 	// Add a pinner.
 	err = db.AddServerForSkylink(ctx, sl, cfg.ServerName, false)
@@ -209,8 +209,8 @@ func TestFindAndLock(t *testing.T) {
 	}
 	// Try to fetch an underpinned skylink, expect none to be found.
 	_, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 
 	// Increase the minimum number of pinners to two.
@@ -223,8 +223,8 @@ func TestFindAndLock(t *testing.T) {
 	// Out test skylink is underpinned but it's pinned by the given server, so
 	// we expect it not to be returned.
 	_, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 	// Try to fetch an underpinned skylink from the name of a different server.
 	// Expect one to be found.
@@ -240,8 +240,8 @@ func TestFindAndLock(t *testing.T) {
 	// Try to unlock the skylink from the name of a server that hasn't locked
 	// it. Expect this to fail.
 	err = db.UnlockSkylink(ctx, sl, thirdServerName)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 	err = db.UnlockSkylink(ctx, sl, anotherServerName)
 	if err != nil {
@@ -250,8 +250,8 @@ func TestFindAndLock(t *testing.T) {
 	// Try to fetch an underpinned skylink with a third server name, expect none
 	// to be found because our skylink is now properly pinned.
 	_, err = db.FindAndLockUnderpinned(ctx, thirdServerName, cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 }
 
@@ -318,7 +318,7 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 	// Fetch a new underpinned skylink. Expect it to fail because we've run out
 	// of underpinned skylinks.
 	newLocked, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-	if !errors.Contains(err, database.ErrSkylinkNoExist) {
-		t.Fatalf("Expected '%v', got '%v'", database.ErrSkylinkNoExist, err)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected '%v', got '%v'", database.ErrSkylinkNotExist, err)
 	}
 }

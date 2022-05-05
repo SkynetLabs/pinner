@@ -19,9 +19,9 @@ var (
 	// ErrSkylinkExists is returned when we try to create a skylink that already
 	// exists.
 	ErrSkylinkExists = errors.New("skylink already exists")
-	// ErrSkylinkNoExist is returned when we try to get a skylink that doesn't
+	// ErrSkylinkNotExist is returned when we try to get a skylink that doesn't
 	// exist.
-	ErrSkylinkNoExist = errors.New("skylink does not exist")
+	ErrSkylinkNotExist = errors.New("skylink does not exist")
 
 	// LockDuration defines the duration of a database lock. We lock skylinks
 	// while we are trying to pin them to a new server. The goal is to only
@@ -68,7 +68,7 @@ func (db *DB) CreateSkylink(ctx context.Context, skylink skymodules.Skylink, ser
 func (db *DB) FindSkylink(ctx context.Context, skylink skymodules.Skylink) (Skylink, error) {
 	sr := db.staticDB.Collection(collSkylinks).FindOne(ctx, bson.M{"skylink": skylink.String()})
 	if sr.Err() == mongo.ErrNoDocuments {
-		return Skylink{}, ErrSkylinkNoExist
+		return Skylink{}, ErrSkylinkNotExist
 	}
 	if sr.Err() != nil {
 		return Skylink{}, sr.Err()
@@ -176,7 +176,7 @@ func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinn
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	sr := db.staticDB.Collection(collSkylinks).FindOneAndUpdate(ctx, filter, update, opts)
 	if sr.Err() == mongo.ErrNoDocuments {
-		return skymodules.Skylink{}, ErrSkylinkNoExist
+		return skymodules.Skylink{}, ErrSkylinkNotExist
 	}
 	if sr.Err() != nil {
 		return skymodules.Skylink{}, sr.Err()
@@ -206,7 +206,7 @@ func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, ser
 	}
 	ur, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
 	if errors.Contains(err, mongo.ErrNoDocuments) || ur.ModifiedCount == 0 {
-		return ErrSkylinkNoExist
+		return ErrSkylinkNotExist
 	}
 	return err
 }
