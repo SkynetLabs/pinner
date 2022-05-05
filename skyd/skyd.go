@@ -66,7 +66,11 @@ func (c *client) Pin(skylink string) error {
 	spp := skymodules.SkyfilePinParameters{
 		SiaPath: skymodules.RandomSiaPath(),
 	}
-	return c.staticClient.SkynetSkylinkPinPost(skylink, spp)
+	err = c.staticClient.SkynetSkylinkPinPost(skylink, spp)
+	if err != nil {
+		c.updateCachedStatus(skylink, false)
+	}
+	return err
 }
 
 // PinnedSkylinks returns the list of skylinks pinned by the local skyd.
@@ -115,7 +119,11 @@ func (c *client) Unpin(skylink string) error {
 		// The skylink is not locally pinned, nothing to do.
 		return nil
 	}
-	return c.staticClient.SkynetSkylinkUnpinPost(skylink)
+	err = c.staticClient.SkynetSkylinkUnpinPost(skylink)
+	if err != nil {
+		c.updateCachedStatus(skylink, false)
+	}
+	return err
 }
 
 // isPinned checks the list of skylinks pinned by the local skyd for the given
@@ -127,4 +135,15 @@ func (c *client) isPinned(skylink string) (bool, error) {
 	}
 	_, exists := sls[skylink]
 	return exists, nil
+}
+
+// updateCachedStatus updates the cached status of the skylink - pinned or not.
+func (c *client) updateCachedStatus(skylink string, pinned bool) {
+	skylinksCache.mu.Lock()
+	defer skylinksCache.mu.Unlock()
+	if pinned {
+		skylinksCache.Skylinks[skylink] = struct{}{}
+	} else {
+		delete(skylinksCache.Skylinks, skylink)
+	}
 }

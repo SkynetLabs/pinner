@@ -302,27 +302,23 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Try fetching another underpinned skylink before unlocking this one.
-	// Expect to always get the same one until we unpin it.
-	for i := 0; i < 10; i++ {
-		newLocked, err := db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if newLocked != locked {
-			t.Fatalf("Expected to get '%s', got '%s'", locked, newLocked)
-		}
+	// Expect to get a different one.
+	newLocked, err := db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newLocked == locked {
+		t.Fatal("Expected to get a different skylink.")
 	}
 	// Unlock it.
 	err = db.UnlockSkylink(ctx, locked, cfg.ServerName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Fetch a new underpinned skylink. Expect it to be a different one.
-	newLocked, err := db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if newLocked == locked {
-		t.Fatal("Fetched the same skylink again.")
+	// Fetch a new underpinned skylink. Expect it to fail because we've run out
+	// of underpinned skylinks.
+	newLocked, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
+	if !errors.Contains(err, database.ErrSkylinkNoExist) {
+		t.Fatalf("Expected '%v', got '%v'", database.ErrSkylinkNoExist, err)
 	}
 }

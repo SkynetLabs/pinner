@@ -26,7 +26,7 @@ var (
 	// LockDuration defines the duration of a database lock. We lock skylinks
 	// while we are trying to pin them to a new server. The goal is to only
 	// allow a single server to pin a given skylink at a time.
-	LockDuration = 24 * time.Hour
+	LockDuration = 7 * time.Hour
 )
 
 type (
@@ -155,14 +155,6 @@ func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Sk
 //     ]
 // })
 func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinners int) (skymodules.Skylink, error) {
-	// First try to fetch a skylink which is locked by the current server. This
-	// is our mechanism for proactively recovering from files being left locked
-	// after a server crash.
-	sl, err := db.findLockedSkylink(ctx, server)
-	if err == nil {
-		return sl, nil
-	}
-	// No files locked by the current server were found, look for unlocked ones.
 	filter := bson.M{
 		"unpin": false,
 		// Pinned by fewer than the minimum number of servers.
@@ -192,31 +184,9 @@ func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinn
 	var result struct {
 		Skylink string
 	}
-	err = sr.Decode(&result)
-	if err != nil {
-		return skymodules.Skylink{}, errors.AddContext(err, "failed to decode result")
-	}
-	return SkylinkFromString(result.Skylink)
-}
-
-// findLockedSkylink fetches a skylink that's locked by the current server, if
-// one exists.
-func (db *DB) findLockedSkylink(ctx context.Context, server string) (skymodules.Skylink, error) {
-	filter := bson.M{
-		"locked_by":    server,
-		"lock_expires": bson.M{"$gt": time.Now().UTC().Truncate(time.Millisecond)},
-		"unpin":        false,
-	}
-	sr := db.staticDB.Collection(collSkylinks).FindOne(ctx, filter)
-	if sr.Err() != nil {
-		return skymodules.Skylink{}, sr.Err()
-	}
-	var result struct {
-		Skylink string
-	}
 	err := sr.Decode(&result)
 	if err != nil {
-		return skymodules.Skylink{}, err
+		return skymodules.Skylink{}, errors.AddContext(err, "failed to decode result")
 	}
 	return SkylinkFromString(result.Skylink)
 }
