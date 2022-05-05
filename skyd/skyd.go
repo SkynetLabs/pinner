@@ -22,7 +22,7 @@ type (
 	// Client describes the interface exposed by client.
 	Client interface {
 		Pin(skylink string) error
-		PinnedSkylinks() (skylinks []string, err error)
+		PinnedSkylinks() (skylinks map[string]interface{}, err error)
 		Unpin(skylink string) error
 	}
 
@@ -34,14 +34,14 @@ type (
 	// so we don't need to fetch that for each skylink we potentially want to
 	// pin/unpin.
 	pinnedSkylinksCache struct {
-		Skylinks   []string
+		Skylinks   map[string]interface{}
 		Expiration time.Time
 		mu         sync.Mutex
 	}
 )
 
 // NewClient creates a new skyd client.
-func NewClient(host, port, password string) *client {
+func NewClient(host, port, password string) Client {
 	opts := skydclient.Options{
 		Address:       fmt.Sprintf("%s:%s", host, port),
 		Password:      password,
@@ -70,7 +70,7 @@ func (c *client) Pin(skylink string) error {
 }
 
 // PinnedSkylinks returns the list of skylinks pinned by the local skyd.
-func (c *client) PinnedSkylinks() (skylinks []string, err error) {
+func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	// Check whether the cache is still valid and return it if so.
@@ -78,7 +78,7 @@ func (c *client) PinnedSkylinks() (skylinks []string, err error) {
 		return skylinksCache.Skylinks, nil
 	}
 	// The cache is not valid, fetch the data from skyd.
-	sls := make([]string, 0)
+	sls := make(map[string]interface{})
 	dirsToWalk := []skymodules.SiaPath{skymodules.SkynetFolder}
 	for len(dirsToWalk) > 0 {
 		// Pop the first dir and walk it.
@@ -90,7 +90,9 @@ func (c *client) PinnedSkylinks() (skylinks []string, err error) {
 			return nil, errors.AddContext(err, "failed to fetch skynet directories from skyd")
 		}
 		for _, f := range rd.Files {
-			sls = append(sls, f.Skylinks...)
+			for _, sl := range f.Skylinks {
+				sls[sl] = struct{}{}
+			}
 		}
 		// Grab all subdirs and queue them for walking.
 		for _, d := range rd.Directories {
@@ -123,10 +125,6 @@ func (c *client) isPinned(skylink string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, s := range sls {
-		if s == skylink {
-			return true, nil
-		}
-	}
-	return false, nil
+	_, exists := sls[skylink]
+	return exists, nil
 }

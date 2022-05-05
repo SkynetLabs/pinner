@@ -5,7 +5,7 @@ import "sync"
 type (
 	// SkydClientMock is a mock of skyd.Client
 	SkydClientMock struct {
-		pinnedSkylinks      []string
+		pinnedSkylinks      map[string]interface{}
 		pinError            error
 		unpinError          error
 		pinnedSkylinksError error
@@ -15,13 +15,9 @@ type (
 )
 
 // IsPinning checks whether skyd is pinning the given skylink.
-func (c *SkydClientMock) IsPinning(sl string) bool {
-	for _, s := range c.pinnedSkylinks {
-		if s == sl {
-			return true
-		}
-	}
-	return false
+func (c *SkydClientMock) IsPinning(skylink string) bool {
+	_, exists := c.pinnedSkylinks[skylink]
+	return exists
 }
 
 // Pin mocks a pin action and responds with a predefined error.
@@ -31,13 +27,13 @@ func (c *SkydClientMock) Pin(skylink string) error {
 	if c.pinError == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		c.pinnedSkylinks = append(c.pinnedSkylinks, skylink)
+		c.pinnedSkylinks[skylink] = struct{}{}
 	}
 	return c.pinError
 }
 
 // PinnedSkylinks is a mock.
-func (c *SkydClientMock) PinnedSkylinks() (skylinks []string, err error) {
+func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]interface{}, err error) {
 	if c.pinnedSkylinksError == nil {
 		return c.pinnedSkylinks, nil
 	}
@@ -51,11 +47,7 @@ func (c *SkydClientMock) Unpin(skylink string) error {
 	if c.unpinError == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		for i, s := range c.pinnedSkylinks {
-			if s == skylink {
-				c.pinnedSkylinks = append(c.pinnedSkylinks[:i], c.pinnedSkylinks[i+1:]...)
-			}
-		}
+		delete(c.pinnedSkylinks, skylink)
 	}
 	return c.unpinError
 }
