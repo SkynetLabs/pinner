@@ -28,7 +28,7 @@ func TestScanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	skydcm := &mocks.SkydClientMock{}
+	skydcm := mocks.NewSkydClientMock()
 	scanner := workers.NewScanner(db, test.NewDiscardLogger(), cfg.MinPinners, cfg.ServerName, skydcm)
 	defer func() {
 		if e := scanner.Close(); e != nil {

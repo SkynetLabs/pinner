@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -27,6 +28,15 @@ import (
  PHASE 3:
  - add a second scanner which looks for skylinks which should be unpinned and unpins them from the local skyd.
 */
+
+// Handy constants used to improve readability.
+const (
+	sectorSize                = 1 << 22         // 4 MiB
+	chunkSize                 = 10 * sectorSize // 40 MiB
+	baseSectorRedundancy      = 10
+	fanoutRedundancy          = 3
+	assumedUploadSpeedInBytes = 1 << 30 / 4 / 8 // 25% of 1Gbps in bytes
+)
 
 var (
 	// SleepBetweenPins defines how long we'll sleep between pinning files.
@@ -115,11 +125,23 @@ func (s *Scanner) threadedScanAndPin() {
 
 // pinUnderpinnedSkylinks loops over all underpinned skylinks and pin them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
-	for s.findAndPinOneUnderpinnedSkylink() {
+
+	for {
+		skylink, continueScanning := s.findAndPinOneUnderpinnedSkylink()
+		if !continueScanning {
+			return
+		}
 		// Sleep for a bit after pinning before continuing with the next
-		// skylink.
+		// skylink. We'll try to roughly estimate how long we need to sleep
+		// before the skylink is uploaded to its full redundancy but if we fail
+		// we'll just sleep for a predefined interval.
+		sleep, err := s.calculateSleep(skylink)
+		if err != nil {
+			s.staticLogger.Warn(errors.AddContext(err, "failed to get metadata for skylink"))
+			sleep = SleepBetweenPins
+		}
 		select {
-		case <-time.After(SleepBetweenPins):
+		case <-time.After(sleep):
 		case <-s.staticTG.StopChan():
 			return
 		}
@@ -130,15 +152,15 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // either locked by the current server or underpinned. If it finds such a
 // skylink, it pins it to the local skyd. The method returns true until it finds
 // no further skylinks to process.
-func (s *Scanner) findAndPinOneUnderpinnedSkylink() bool {
+func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, continueScanning bool) {
 	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
 	if errors.Contains(err, database.ErrSkylinkNotExist) {
 		// No more underpinned skylinks pinnable by this server.
-		return false
+		return "", false
 	}
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch underpinned skylink"))
-		return true
+		return "", true
 	}
 	defer func() {
 		err = s.staticDB.UnlockSkylink(context.TODO(), sl, s.staticServerName)
@@ -149,8 +171,29 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() bool {
 	err = s.staticSkydClient.Pin(sl.String())
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to pin skylink"))
-		return true
+		return "", true
 	}
 	s.staticLogger.Debugf("Successfully pinned %s", sl)
-	return true
+	return sl.String(), true
+}
+
+// calculateSleep calculates how long we should sleep after pinning the given
+// skylink in order to give the renter time to fully upload it before we pin
+// another one. It returns a ballpark value.
+//
+// This method makes some assumptions for simplicity:
+// * assumes lazy pinning, meaning that none of the fanout is uploaded
+// * all skyfiles are assumed to be large files (base sector + fanout) and the
+//	metadata is assumed to fill up the base sector (to err on the safe side)
+func (s *Scanner) calculateSleep(skylink string) (time.Duration, error) {
+	meta, err := s.staticSkydClient.Metadata(skylink)
+	if err != nil {
+		return 0, err
+	}
+	numChunks := math.Ceil(float64(meta.Length) / chunkSize)
+	// remainingUpload is the amount of data we expect to need to upload until
+	// the skyfile reaches full redundancy.
+	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*sectorSize
+	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
+	return time.Duration(secondsRemaining) * time.Second, nil
 }

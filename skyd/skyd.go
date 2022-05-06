@@ -21,6 +21,7 @@ var (
 type (
 	// Client describes the interface exposed by client.
 	Client interface {
+		Metadata(skylink string) (skymodules.SkyfileMetadata, error)
 		Pin(skylink string) error
 		PinnedSkylinks() (skylinks map[string]interface{}, err error)
 		Unpin(skylink string) error
@@ -51,6 +52,15 @@ func NewClient(host, port, password string) Client {
 	return &client{
 		staticClient: skydclient.New(opts),
 	}
+}
+
+// Metadata returns the metadata of the skylink
+func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
+	_, meta, err := c.staticClient.SkynetMetadataGet(skylink)
+	if err != nil {
+		return skymodules.SkyfileMetadata{}, err
+	}
+	return meta, nil
 }
 
 // Pin instructs the local skyd to pin the given skylink.

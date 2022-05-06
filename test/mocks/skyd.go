@@ -1,6 +1,10 @@
 package mocks
 
-import "sync"
+import (
+	"sync"
+
+	"gitlab.com/SkynetLabs/skyd/skymodules"
+)
 
 type (
 	// SkydClientMock is a mock of skyd.Client
@@ -9,15 +13,34 @@ type (
 		pinError            error
 		unpinError          error
 		pinnedSkylinksError error
+		metadata            map[string]skymodules.SkyfileMetadata
+		metadataErrors      map[string]error
 
 		mu sync.Mutex
 	}
 )
 
+// NewSkydClientMock returns an initialised copy of SkydClientMock
+func NewSkydClientMock() *SkydClientMock {
+	return &SkydClientMock{
+		pinnedSkylinks: make(map[string]interface{}),
+		metadata:       make(map[string]skymodules.SkyfileMetadata),
+		metadataErrors: make(map[string]error),
+	}
+}
+
 // IsPinning checks whether skyd is pinning the given skylink.
 func (c *SkydClientMock) IsPinning(skylink string) bool {
 	_, exists := c.pinnedSkylinks[skylink]
 	return exists
+}
+
+// Metadata returns the metadata of the skylink or the pre-set error.
+func (c *SkydClientMock) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
+	if c.metadataErrors[skylink] != nil {
+		return skymodules.SkyfileMetadata{}, c.metadataErrors[skylink]
+	}
+	return c.metadata[skylink], nil
 }
 
 // Pin mocks a pin action and responds with a predefined error.
@@ -52,17 +75,24 @@ func (c *SkydClientMock) Unpin(skylink string) error {
 	return c.unpinError
 }
 
-// SetPinError set the pin error
+// SetMetadata sets the metadata or error returned when fetching metadata for a
+// given skylink. If both are provided the error takes precedence.
+func (c *SkydClientMock) SetMetadata(skylink string, meta skymodules.SkyfileMetadata, err error) {
+	c.metadata[skylink] = meta
+	c.metadataErrors[skylink] = err
+}
+
+// SetPinError sets the pin error
 func (c *SkydClientMock) SetPinError(e error) {
 	c.pinError = e
 }
 
-// SetPinnedSkylinksError set the pinnedSkylinks error
+// SetPinnedSkylinksError sets the pinnedSkylinks error
 func (c *SkydClientMock) SetPinnedSkylinksError(e error) {
 	c.pinnedSkylinksError = e
 }
 
-// SetUnpinError set the unpin error
+// SetUnpinError sets the unpin error
 func (c *SkydClientMock) SetUnpinError(e error) {
 	c.unpinError = e
 }
