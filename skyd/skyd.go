@@ -23,8 +23,9 @@ var (
 type (
 	// Client describes the interface exposed by client.
 	Client interface {
+		FileHealth(sp skymodules.SiaPath) (float64, error)
 		Metadata(skylink string) (skymodules.SkyfileMetadata, error)
-		Pin(skylink string) error
+		Pin(skylink string) (skymodules.SiaPath, error)
 		PinnedSkylinks() (skylinks map[string]interface{}, err error)
 		Unpin(skylink string) error
 	}
@@ -56,6 +57,16 @@ func NewClient(host, port, password string) Client {
 	}
 }
 
+// FileHealth returns the health of the given sia file.
+// Perfect health is 0.
+func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
+	rf, err := c.staticClient.RenterFileRootGet(sp)
+	if err != nil {
+		return 0, err
+	}
+	return rf.File.Health, nil
+}
+
 // Metadata returns the metadata of the skylink
 func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
 	_, meta, err := c.staticClient.SkynetMetadataGet(skylink)
@@ -66,23 +77,20 @@ func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
 }
 
 // Pin instructs the local skyd to pin the given skylink.
-func (c *client) Pin(skylink string) error {
+func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 	pinned, err := c.isPinned(skylink)
 	if err != nil {
-		return err
+		return skymodules.SiaPath{}, err
 	}
 	if pinned {
 		// The skylink is already locally pinned, nothing to do.
-		return nil
+		return skymodules.SiaPath{}, nil
 	}
-	spp := skymodules.SkyfilePinParameters{
-		SiaPath: skymodules.RandomSiaPath(),
-	}
-	err = c.staticClient.SkynetSkylinkPinPost(skylink, spp)
+	sp, err := c.staticClient.SkynetSkylinkPinLazyPost(skylink)
 	if err != nil {
 		c.updateCachedStatus(skylink, false)
 	}
-	return err
+	return sp, err
 }
 
 // PinnedSkylinks returns the list of skylinks pinned by the local skyd.

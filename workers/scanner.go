@@ -11,6 +11,7 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/threadgroup"
 	"gitlab.com/SkynetLabs/skyd/build"
+	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 /**
@@ -47,6 +48,14 @@ var (
 	SleepBetweenPins = build.Select(
 		build.Var{
 			Standard: 10 * time.Second,
+			Dev:      time.Second,
+			Testing:  time.Millisecond,
+		}).(time.Duration)
+	// SleepBetweenHealthChecks defines the wait time between calls to skyd to
+	// check the current health of a given file.
+	SleepBetweenHealthChecks = build.Select(
+		build.Var{
+			Standard: 5 * time.Second,
 			Dev:      time.Second,
 			Testing:  time.Millisecond,
 		}).(time.Duration)
@@ -123,26 +132,41 @@ func (s *Scanner) threadedScanAndPin() {
 	}
 }
 
-// pinUnderpinnedSkylinks loops over all underpinned skylinks and pin them.
+// pinUnderpinnedSkylinks loops over all underpinned skylinks and pins them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
 	for {
-		skylink, continueScanning := s.findAndPinOneUnderpinnedSkylink()
+		skylink, sp, continueScanning := s.findAndPinOneUnderpinnedSkylink()
 		if !continueScanning {
 			return
 		}
-		// Sleep for a bit after pinning before continuing with the next
-		// skylink. We'll try to roughly estimate how long we need to sleep
-		// before the skylink is uploaded to its full redundancy but if we fail
-		// we'll just sleep for a predefined interval.
-		sleep, err := s.calculateSleep(skylink)
-		if err != nil {
-			s.staticLogger.Warn(errors.AddContext(err, "failed to get metadata for skylink"))
-			sleep = SleepBetweenPins
-		}
-		select {
-		case <-time.After(sleep):
-		case <-s.staticTG.StopChan():
-			return
+
+		deadlineTimer := s.deadline(skylink)
+		defer deadlineTimer.Stop()
+		ticker := time.NewTicker(SleepBetweenHealthChecks)
+		defer ticker.Stop()
+
+		// Wait for the pinned file to become fully healthy.
+		for {
+			health, err := s.staticSkydClient.FileHealth(sp)
+			if err != nil {
+				err = errors.AddContext(err, "failed to get sia file's health")
+				s.staticLogger.Error(err)
+				build.Critical(err)
+				break
+			}
+			if health == 0 {
+				// The file is now fully uploaded and healthy.
+				break
+			}
+			select {
+			case <-ticker.C:
+				s.staticLogger.Tracef("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
+			case <-deadlineTimer.C:
+				s.staticLogger.Warnf("Skylink '%s' failed to reach full health within the time limit.", skylink)
+				break
+			case <-s.staticTG.StopChan():
+				return
+			}
 		}
 	}
 }
@@ -151,15 +175,15 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // either locked by the current server or underpinned. If it finds such a
 // skylink, it pins it to the local skyd. The method returns true until it finds
 // no further skylinks to process.
-func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, continueScanning bool) {
+func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodules.SiaPath, continueScanning bool) {
 	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
 	if errors.Contains(err, database.ErrSkylinkNotExist) {
 		// No more underpinned skylinks pinnable by this server.
-		return "", false
+		return
 	}
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch underpinned skylink"))
-		return "", true
+		return
 	}
 	defer func() {
 		err = s.staticDB.UnlockSkylink(context.TODO(), sl, s.staticServerName)
@@ -167,16 +191,17 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, continueSca
 			s.staticLogger.Debug(errors.AddContext(err, "failed to unlock skylink after trying to pin it"))
 		}
 	}()
-	err = s.staticSkydClient.Pin(sl.String())
+	sf, err = s.staticSkydClient.Pin(sl.String())
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to pin skylink"))
-		return "", true
+		continueScanning = true
+		return
 	}
 	s.staticLogger.Debugf("Successfully pinned %s", sl)
-	return sl.String(), true
+	return sl.String(), sf, true
 }
 
-// calculateSleep calculates how long we should sleep after pinning the given
+// estimateTimeToFull calculates how long we should sleep after pinning the given
 // skylink in order to give the renter time to fully upload it before we pin
 // another one. It returns a ballpark value.
 //
@@ -184,15 +209,24 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, continueSca
 // * assumes lazy pinning, meaning that none of the fanout is uploaded
 // * all skyfiles are assumed to be large files (base sector + fanout) and the
 //	metadata is assumed to fill up the base sector (to err on the safe side)
-func (s *Scanner) calculateSleep(skylink string) (time.Duration, error) {
+func (s *Scanner) estimateTimeToFull(skylink string) time.Duration {
 	meta, err := s.staticSkydClient.Metadata(skylink)
 	if err != nil {
-		return 0, err
+		s.staticLogger.Warn(errors.AddContext(err, "failed to get metadata for skylink"))
+		return SleepBetweenPins
 	}
+
 	numChunks := math.Ceil(float64(meta.Length) / chunkSize)
 	// remainingUpload is the amount of data we expect to need to upload until
 	// the skyfile reaches full redundancy.
 	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*sectorSize
 	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
-	return time.Duration(secondsRemaining) * time.Second, nil
+	return time.Duration(secondsRemaining) * time.Second
+}
+
+// deadline calculates how much we are willing to wait for a skylink to be fully
+// healthy before giving up. It's twice the expected time, as returned by
+// estimateTimeToFull.
+func (s *Scanner) deadline(skylink string) *time.Timer {
+	return time.NewTimer(2 * s.estimateTimeToFull(skylink))
 }

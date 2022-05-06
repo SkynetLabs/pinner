@@ -9,7 +9,7 @@ import (
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
-// TestScanner_calculateSleep ensures that calculateSleep returns what we expect.
+// TestScanner_calculateSleep ensures that estimateTimeToFull returns what we expect.
 func TestScanner_calculateSleep(t *testing.T) {
 	tests := map[string]struct {
 		dataSize      uint64
@@ -48,10 +48,7 @@ func TestScanner_calculateSleep(t *testing.T) {
 		meta := skymodules.SkyfileMetadata{Length: tt.dataSize}
 		skydMock.SetMetadata(skylink, meta, nil)
 
-		sleep, err := scanner.calculateSleep(skylink)
-		if err != nil {
-			t.Fatalf("%s: failed with error %v", tname, err)
-		}
+		sleep := scanner.estimateTimeToFull(skylink)
 		if sleep != tt.expectedSleep {
 			t.Errorf("%s: expected %ds, got %ds", tname, tt.expectedSleep/time.Second, sleep/time.Second)
 		}

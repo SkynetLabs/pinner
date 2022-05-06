@@ -29,6 +29,11 @@ func NewSkydClientMock() *SkydClientMock {
 	}
 }
 
+// FileHealth returns the health of the given skylink.
+func (c *SkydClientMock) FileHealth(_ skymodules.SiaPath) (float64, error) {
+	return 0, nil
+}
+
 // IsPinning checks whether skyd is pinning the given skylink.
 func (c *SkydClientMock) IsPinning(skylink string) bool {
 	_, exists := c.pinnedSkylinks[skylink]
@@ -46,13 +51,16 @@ func (c *SkydClientMock) Metadata(skylink string) (skymodules.SkyfileMetadata, e
 // Pin mocks a pin action and responds with a predefined error.
 // If the predefined error is nil, it adds the given skylink to the list of
 // skylinks pinned in the mock.
-func (c *SkydClientMock) Pin(skylink string) error {
+func (c *SkydClientMock) Pin(skylink string) (skymodules.SiaPath, error) {
 	if c.pinError == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.pinnedSkylinks[skylink] = struct{}{}
 	}
-	return c.pinError
+	sp := skymodules.SiaPath{
+		Path: skylink,
+	}
+	return sp, c.pinError
 }
 
 // PinnedSkylinks is a mock.
