@@ -2,12 +2,14 @@ package skyd
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/errors"
 	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
+	"gitlab.com/SkynetLabs/skyd/skymodules/renter"
 )
 
 var (
@@ -35,8 +37,8 @@ type (
 	// so we don't need to fetch that for each skylink we potentially want to
 	// pin/unpin.
 	pinnedSkylinksCache struct {
-		Skylinks   map[string]interface{}
-		Expiration time.Time
+		expiration time.Time
+		skylinks   map[string]interface{}
 		mu         sync.Mutex
 	}
 )
@@ -88,8 +90,8 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	// Check whether the cache is still valid and return it if so.
-	if skylinksCache.Expiration.After(time.Now().UTC()) {
-		return skylinksCache.Skylinks, nil
+	if skylinksCache.expiration.After(time.Now().UTC()) {
+		return skylinksCache.skylinks, nil
 	}
 	// The cache is not valid, fetch the data from skyd.
 	sls := make(map[string]interface{})
@@ -114,23 +116,17 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 		}
 	}
 	// Update the cache.
-	skylinksCache.Skylinks = sls
-	skylinksCache.Expiration = time.Now().UTC().Add(skylinksCacheDuration)
+	skylinksCache.skylinks = sls
+	skylinksCache.expiration = time.Now().UTC().Add(skylinksCacheDuration)
 	return sls, nil
 }
 
 // Unpin instructs the local skyd to unpin the given skylink.
 func (c *client) Unpin(skylink string) error {
-	pinned, err := c.isPinned(skylink)
-	if err != nil {
-		return err
-	}
-	if !pinned {
-		// The skylink is not locally pinned, nothing to do.
-		return nil
-	}
-	err = c.staticClient.SkynetSkylinkUnpinPost(skylink)
-	if err != nil {
+	err := c.staticClient.SkynetSkylinkUnpinPost(skylink)
+	// Update the cached status of the skylink if there is no error or the error
+	// indicates that the skylink is blocked.
+	if err != nil || strings.Contains(err.Error(), renter.ErrSkylinkBlocked.Error()) {
 		c.updateCachedStatus(skylink, false)
 	}
 	return err
@@ -152,8 +148,8 @@ func (c *client) updateCachedStatus(skylink string, pinned bool) {
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	if pinned {
-		skylinksCache.Skylinks[skylink] = struct{}{}
+		skylinksCache.skylinks[skylink] = struct{}{}
 	} else {
-		delete(skylinksCache.Skylinks, skylink)
+		delete(skylinksCache.skylinks, skylink)
 	}
 }

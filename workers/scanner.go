@@ -125,7 +125,6 @@ func (s *Scanner) threadedScanAndPin() {
 
 // pinUnderpinnedSkylinks loops over all underpinned skylinks and pin them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
-
 	for {
 		skylink, continueScanning := s.findAndPinOneUnderpinnedSkylink()
 		if !continueScanning {
