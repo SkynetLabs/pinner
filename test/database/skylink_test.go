@@ -240,8 +240,8 @@ func TestFindAndLock(t *testing.T) {
 	// Try to unlock the skylink from the name of a server that hasn't locked
 	// it. Expect this to fail.
 	err = db.UnlockSkylink(ctx, sl, thirdServerName)
-	if !errors.Contains(err, database.ErrSkylinkNotExist) {
-		t.Fatalf("Expected to get '%v', got '%v'", database.ErrSkylinkNotExist, err)
+	if !errors.Contains(err, database.ErrNoSkylinksLocked) {
+		t.Fatalf("Expected to get '%v', got '%v'", database.ErrNoSkylinksLocked, err)
 	}
 	err = db.UnlockSkylink(ctx, sl, anotherServerName)
 	if err != nil {

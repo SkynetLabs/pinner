@@ -2,16 +2,17 @@ package workers
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/fastrand"
 	"gitlab.com/NebulousLabs/threadgroup"
 	"gitlab.com/SkynetLabs/skyd/build"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
+	"go.sia.tech/siad/modules"
 )
 
 /**
@@ -32,8 +33,6 @@ import (
 
 // Handy constants used to improve readability.
 const (
-	sectorSize                = 1 << 22         // 4 MiB
-	chunkSize                 = 10 * sectorSize // 40 MiB
 	baseSectorRedundancy      = 10
 	fanoutRedundancy          = 3
 	assumedUploadSpeedInBytes = 1 << 30 / 4 / 8 // 25% of 1Gbps in bytes
@@ -60,14 +59,23 @@ var (
 			Testing:  time.Millisecond,
 		}).(time.Duration)
 
-	// SleepBetweenScans defines how often we'll scan the DB for underpinned
+	// sleepBetweenScans defines how often we'll scan the DB for underpinned
 	// skylinks.
-	SleepBetweenScans = build.Select(build.Var{
+	sleepBetweenScans = build.Select(build.Var{
 		// In production we want to use a prime number of hours, so we can
 		// de-sync the scan and the sweeps.
 		Standard: 19 * time.Hour,
 		Dev:      10 * time.Second,
 		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
+	// sleepBetweenScansVariation defines how much the sleep between scans will
+	// vary between executions
+	sleepBetweenScansVariation = build.Select(build.Var{
+		// In production we want to use a prime number of hours, so we can
+		// de-sync the scan and the sweeps.
+		Standard: 2 * time.Hour,
+		Dev:      1 * time.Second,
+		Testing:  10 * time.Millisecond,
 	}).(time.Duration)
 )
 
@@ -125,7 +133,7 @@ func (s *Scanner) threadedScanAndPin() {
 		s.pinUnderpinnedSkylinks()
 		// Sleep between database scans.
 		select {
-		case <-time.After(SleepBetweenScans):
+		case <-time.After(SleepBetweenScans()):
 		case <-s.staticTG.StopChan():
 			return
 		}
@@ -135,6 +143,13 @@ func (s *Scanner) threadedScanAndPin() {
 // pinUnderpinnedSkylinks loops over all underpinned skylinks and pins them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
 	for {
+		// Check for service shutdown before talking to the DB.
+		select {
+		case <-s.staticTG.StopChan():
+			return
+		default:
+		}
+
 		skylink, sp, continueScanning := s.findAndPinOneUnderpinnedSkylink()
 		if !continueScanning {
 			return
@@ -212,16 +227,28 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodul
 func (s *Scanner) estimateTimeToFull(skylink string) time.Duration {
 	meta, err := s.staticSkydClient.Metadata(skylink)
 	if err != nil {
-		s.staticLogger.Warn(errors.AddContext(err, "failed to get metadata for skylink"))
+		err = errors.AddContext(err, "failed to get metadata for skylink")
+		s.staticLogger.Error(err)
+		build.Critical(err)
 		return SleepBetweenPins
 	}
-
-	numChunks := math.Ceil(float64(meta.Length) / chunkSize)
+	chunkSize := 10 * modules.SectorSizeStandard
+	numChunks := meta.Length / chunkSize
+	if meta.Length%chunkSize > 0 {
+		numChunks++
+	}
 	// remainingUpload is the amount of data we expect to need to upload until
 	// the skyfile reaches full redundancy.
-	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*sectorSize
+	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*modules.SectorSize
 	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
 	return time.Duration(secondsRemaining) * time.Second
+}
+
+// SleepBetweenScans defines how often we'll scan the DB for underpinned
+// skylinks. The returned value varies by +/-sleepBetweenScansVariation and it's
+// centered on sleepBetweenScans.
+func SleepBetweenScans() time.Duration {
+	return sleepBetweenScans - sleepBetweenScansVariation + time.Duration(fastrand.Intn(2*int(sleepBetweenScansVariation)))
 }
 
 // deadline calculates how much we are willing to wait for a skylink to be fully

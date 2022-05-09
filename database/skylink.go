@@ -22,7 +22,9 @@ var (
 	// ErrSkylinkNotExist is returned when we try to get a skylink that doesn't
 	// exist.
 	ErrSkylinkNotExist = errors.New("skylink does not exist")
-
+	// ErrNoSkylinksLocked is returned when we try to lock underpinned skylinks
+	// for pinning but we fail to do so.
+	ErrNoSkylinksLocked = errors.New("no skylinks locked")
 	// LockDuration defines the duration of a database lock. We lock skylinks
 	// while we are trying to pin them to a new server. The goal is to only
 	// allow a single server to pin a given skylink at a time.
@@ -206,7 +208,7 @@ func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, ser
 	}
 	ur, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
 	if errors.Contains(err, mongo.ErrNoDocuments) || ur.ModifiedCount == 0 {
-		return ErrSkylinkNotExist
+		return ErrNoSkylinksLocked
 	}
 	return err
 }
