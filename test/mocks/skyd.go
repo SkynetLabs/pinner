@@ -71,6 +71,11 @@ func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]interface{}, err 
 	return nil, c.pinnedSkylinksError
 }
 
+// Resolve is a mock.
+func (c *SkydClientMock) Resolve(skylink string) (string, error) {
+	return skylink, nil
+}
+
 // Unpin mocks an unpin action and responds with a predefined error.
 // If the error is nil, Unpin removes the skylink from the list of pinned
 // skylinks.

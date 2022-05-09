@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/test/mocks"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
 )
@@ -66,7 +67,7 @@ func NewTester(dbName string) (*Tester, error) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 
 	// The server API encapsulates all the modules together.
-	server, err := api.New(cfg.ServerName, db, logger)
+	server, err := api.New(cfg.ServerName, db, logger, mocks.NewSkydClientMock())
 	if err != nil {
 		cancel()
 		return nil, errors.AddContext(err, "failed to build the API")

@@ -46,7 +46,7 @@ func main() {
 	}
 
 	// Initialise the server.
-	server, err := api.New(cfg.ServerName, db, logger)
+	server, err := api.New(cfg.ServerName, db, logger, skydClient)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}

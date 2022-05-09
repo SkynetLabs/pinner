@@ -27,6 +27,7 @@ type (
 		Metadata(skylink string) (skymodules.SkyfileMetadata, error)
 		Pin(skylink string) (skymodules.SiaPath, error)
 		PinnedSkylinks() (skylinks map[string]interface{}, err error)
+		Resolve(skylink string) (string, error)
 		Unpin(skylink string) error
 	}
 
@@ -127,6 +128,12 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 	skylinksCache.skylinks = sls
 	skylinksCache.expiration = time.Now().UTC().Add(skylinksCacheDuration)
 	return sls, nil
+}
+
+// Resolve resolves a V2 skylink to a V1 skylink. Returns an error if the given
+// skylink is not V2.
+func (c *client) Resolve(skylink string) (string, error) {
+	return c.staticClient.ResolveSkylinkV2(skylink)
 }
 
 // Unpin instructs the local skyd to unpin the given skylink.

@@ -43,6 +43,18 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
 		return
 	}
+	if sl.IsSkylinkV2() {
+		s, err := api.staticSkydClient.Resolve(sl.String())
+		if err != nil {
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
+		err = sl.LoadString(s)
+		if err != nil {
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
 	// Create the skylink.
 	_, err = api.staticDB.CreateSkylink(req.Context(), sl, api.staticServerName)
 	// If the skylink already exists, add this server to its list of servers and
@@ -70,6 +82,18 @@ func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter
 	if err != nil {
 		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
 		return
+	}
+	if sl.IsSkylinkV2() {
+		s, err := api.staticSkydClient.Resolve(sl.String())
+		if err != nil {
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
+		err = sl.LoadString(s)
+		if err != nil {
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
 	}
 	err = api.staticDB.MarkUnpinned(req.Context(), sl)
 	if err != nil {
