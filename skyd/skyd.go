@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
 	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
@@ -13,6 +15,9 @@ import (
 )
 
 var (
+	// ErrSkylinkAlreadyPinned is returned when the skylink we're trying to pin
+	// is already pinned.
+	ErrSkylinkAlreadyPinned = errors.New("skylink already pinned")
 	// skylinksCache is a local cache of the list of skylinks pinned by the
 	// local skyd
 	skylinksCache pinnedSkylinksCache
@@ -34,6 +39,7 @@ type (
 	// client allows us to call the local skyd instance.
 	client struct {
 		staticClient *skydclient.Client
+		staticLogger *logrus.Logger
 	}
 	// renterDirCache is a simple cache of the renter's directory information,
 	// so we don't need to fetch that for each skylink we potentially want to
@@ -46,7 +52,7 @@ type (
 )
 
 // NewClient creates a new skyd client.
-func NewClient(host, port, password string) Client {
+func NewClient(host, port, password string, logger *logrus.Logger) Client {
 	opts := skydclient.Options{
 		Address:       fmt.Sprintf("%s:%s", host, port),
 		Password:      password,
@@ -55,12 +61,15 @@ func NewClient(host, port, password string) Client {
 	}
 	return &client{
 		staticClient: skydclient.New(opts),
+		staticLogger: logger,
 	}
 }
 
 // FileHealth returns the health of the given sia file.
 // Perfect health is 0.
 func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
+	c.staticLogger.Trace("Entering FileHealth.")
+	defer c.staticLogger.Trace("Exiting FileHealth.")
 	rf, err := c.staticClient.RenterFileRootGet(sp)
 	if err != nil {
 		return 0, err
@@ -70,6 +79,8 @@ func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
 
 // Metadata returns the metadata of the skylink
 func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
+	c.staticLogger.Trace("Entering Metadata.")
+	defer c.staticLogger.Trace("Exiting Metadata.")
 	_, meta, err := c.staticClient.SkynetMetadataGet(skylink)
 	if err != nil {
 		return skymodules.SkyfileMetadata{}, err
@@ -79,23 +90,31 @@ func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
 
 // Pin instructs the local skyd to pin the given skylink.
 func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
+	c.staticLogger.Tracef("Entering Pin. Skylink: '%s'", skylink)
+	defer c.staticLogger.Trace("Exiting Pin.")
+	_, err := database.SkylinkFromString(skylink)
+	if err != nil {
+		return skymodules.SiaPath{}, errors.Compose(err, database.ErrInvalidSkylink)
+	}
 	pinned, err := c.isPinned(skylink)
 	if err != nil {
 		return skymodules.SiaPath{}, err
 	}
 	if pinned {
 		// The skylink is already locally pinned, nothing to do.
-		return skymodules.SiaPath{}, nil
+		return skymodules.SiaPath{}, ErrSkylinkAlreadyPinned
 	}
 	sp, err := c.staticClient.SkynetSkylinkPinLazyPost(skylink)
-	if err != nil {
-		c.updateCachedStatus(skylink, false)
+	if err == nil || errors.Contains(err, ErrSkylinkAlreadyPinned) {
+		c.updateCachedStatus(skylink, true)
 	}
 	return sp, err
 }
 
 // PinnedSkylinks returns the list of skylinks pinned by the local skyd.
 func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
+	c.staticLogger.Trace("Entering PinnedSkylinks.")
+	defer c.staticLogger.Trace("Exiting PinnedSkylinks.")
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	// Check whether the cache is still valid and return it if so.
@@ -109,7 +128,6 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 		// Pop the first dir and walk it.
 		dir := dirsToWalk[0]
 		dirsToWalk = dirsToWalk[1:]
-
 		rd, err := c.staticClient.RenterDirRootGet(dir)
 		if err != nil {
 			return nil, errors.AddContext(err, "failed to fetch skynet directories from skyd")
@@ -121,6 +139,9 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 		}
 		// Grab all subdirs and queue them for walking.
 		for _, d := range rd.Directories {
+			if d.SiaPath.String() == dir.String() {
+				continue
+			}
 			dirsToWalk = append(dirsToWalk, d.SiaPath)
 		}
 	}
@@ -133,11 +154,15 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 // Resolve resolves a V2 skylink to a V1 skylink. Returns an error if the given
 // skylink is not V2.
 func (c *client) Resolve(skylink string) (string, error) {
+	c.staticLogger.Trace("Entering Resolve.")
+	defer c.staticLogger.Trace("Exiting Resolve.")
 	return c.staticClient.ResolveSkylinkV2(skylink)
 }
 
 // Unpin instructs the local skyd to unpin the given skylink.
 func (c *client) Unpin(skylink string) error {
+	c.staticLogger.Trace("Entering Unpin.")
+	defer c.staticLogger.Trace("Exiting Unpin.")
 	err := c.staticClient.SkynetSkylinkUnpinPost(skylink)
 	// Update the cached status of the skylink if there is no error or the error
 	// indicates that the skylink is blocked.
@@ -150,6 +175,8 @@ func (c *client) Unpin(skylink string) error {
 // isPinned checks the list of skylinks pinned by the local skyd for the given
 // skylink and returns true if it finds it.
 func (c *client) isPinned(skylink string) (bool, error) {
+	c.staticLogger.Trace("Entering isPinned.")
+	defer c.staticLogger.Trace("Exiting isPinned.")
 	sls, err := c.PinnedSkylinks()
 	if err != nil {
 		return false, err
@@ -160,6 +187,8 @@ func (c *client) isPinned(skylink string) (bool, error) {
 
 // updateCachedStatus updates the cached status of the skylink - pinned or not.
 func (c *client) updateCachedStatus(skylink string, pinned bool) {
+	c.staticLogger.Trace("Entering updateCachedStatus.")
+	defer c.staticLogger.Trace("Exiting updateCachedStatus.")
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	if pinned {
