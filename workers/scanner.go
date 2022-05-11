@@ -192,8 +192,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // no further skylinks to process.
 func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodules.SiaPath, continueScanning bool) {
 	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
-	if errors.Contains(err, database.ErrSkylinkNotExist) {
-		// No more underpinned skylinks pinnable by this server.
+	if database.IsNoSkylinksNeedPinning(err) {
 		return
 	}
 	if err != nil {

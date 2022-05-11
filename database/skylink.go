@@ -25,6 +25,9 @@ var (
 	// ErrNoSkylinksLocked is returned when we try to lock underpinned skylinks
 	// for pinning but we fail to do so.
 	ErrNoSkylinksLocked = errors.New("no skylinks locked")
+	// ErrNoUnderpinnedSkylinks is returned when all skylinks in the database
+	// are either sufficiently pinned or pinned by the local server.
+	ErrNoUnderpinnedSkylinks = errors.New("no underpinned skylinks found")
 	// LockDuration defines the duration of a database lock. We lock skylinks
 	// while we are trying to pin them to a new server. The goal is to only
 	// allow a single server to pin a given skylink at a time.
@@ -178,7 +181,7 @@ func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinn
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	sr := db.staticDB.Collection(collSkylinks).FindOneAndUpdate(ctx, filter, update, opts)
 	if sr.Err() == mongo.ErrNoDocuments {
-		return skymodules.Skylink{}, ErrSkylinkNotExist
+		return skymodules.Skylink{}, ErrNoUnderpinnedSkylinks
 	}
 	if sr.Err() != nil {
 		return skymodules.Skylink{}, sr.Err()
@@ -211,6 +214,12 @@ func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, ser
 		return ErrNoSkylinksLocked
 	}
 	return err
+}
+
+// IsNoSkylinksNeedPinning returns true when the given error indicates that
+// there are no more skylinks that need to be pinned by the current server.
+func IsNoSkylinksNeedPinning(err error) bool {
+	return errors.Contains(err, ErrNoUnderpinnedSkylinks)
 }
 
 // SkylinkFromString converts a string to a Skylink.
