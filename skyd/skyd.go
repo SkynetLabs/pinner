@@ -16,8 +16,8 @@ var (
 	// skylinksCache is a local cache of the list of skylinks pinned by the
 	// local skyd
 	skylinksCache pinnedSkylinksCache
-	// skylinksCacheDuration defines the duration of skylinksCache
-	skylinksCacheDuration = time.Hour
+	// skylinksCacheTTL defines the duration of skylinksCache
+	skylinksCacheTTL = time.Hour
 )
 
 type (
@@ -27,6 +27,7 @@ type (
 		Metadata(skylink string) (skymodules.SkyfileMetadata, error)
 		Pin(skylink string) (skymodules.SiaPath, error)
 		PinnedSkylinks() (skylinks map[string]interface{}, err error)
+		RebuildCache() error
 		Resolve(skylink string) (string, error)
 		Unpin(skylink string) error
 	}
@@ -98,11 +99,11 @@ func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
-	// Check whether the cache is still valid and return it if so.
-	if skylinksCache.expiration.After(time.Now().UTC()) {
-		return skylinksCache.skylinks, nil
-	}
-	// The cache is not valid, fetch the data from skyd.
+	return skylinksCache.skylinks, nil
+}
+
+// RebuildCache rebuilds the cache of skylinks pinned by the local skyd.
+func (c *client) RebuildCache() error {
 	sls := make(map[string]interface{})
 	dirsToWalk := []skymodules.SiaPath{skymodules.SkynetFolder}
 	for len(dirsToWalk) > 0 {
@@ -112,7 +113,7 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 
 		rd, err := c.staticClient.RenterDirRootGet(dir)
 		if err != nil {
-			return nil, errors.AddContext(err, "failed to fetch skynet directories from skyd")
+			return errors.AddContext(err, "failed to fetch skynet directories from skyd")
 		}
 		for _, f := range rd.Files {
 			for _, sl := range f.Skylinks {
@@ -125,9 +126,11 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 		}
 	}
 	// Update the cache.
+	skylinksCache.mu.Lock()
+	defer skylinksCache.mu.Unlock()
 	skylinksCache.skylinks = sls
-	skylinksCache.expiration = time.Now().UTC().Add(skylinksCacheDuration)
-	return sls, nil
+	skylinksCache.expiration = time.Now().UTC().Add(skylinksCacheTTL)
+	return nil
 }
 
 // Resolve resolves a V2 skylink to a V1 skylink. Returns an error if the given
