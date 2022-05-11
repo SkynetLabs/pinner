@@ -106,7 +106,7 @@ func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 	}
 	sp, err := c.staticClient.SkynetSkylinkPinLazyPost(skylink)
 	if err == nil || errors.Contains(err, ErrSkylinkAlreadyPinned) {
-		c.updateCachedStatus(skylink, true)
+		c.managedUpdateCachedStatus(skylink, true)
 	}
 	return sp, err
 }
@@ -167,7 +167,7 @@ func (c *client) Unpin(skylink string) error {
 	// Update the cached status of the skylink if there is no error or the error
 	// indicates that the skylink is blocked.
 	if err != nil || strings.Contains(err.Error(), renter.ErrSkylinkBlocked.Error()) {
-		c.updateCachedStatus(skylink, false)
+		c.managedUpdateCachedStatus(skylink, false)
 	}
 	return err
 }
@@ -185,10 +185,11 @@ func (c *client) isPinned(skylink string) (bool, error) {
 	return exists, nil
 }
 
-// updateCachedStatus updates the cached status of the skylink - pinned or not.
-func (c *client) updateCachedStatus(skylink string, pinned bool) {
-	c.staticLogger.Trace("Entering updateCachedStatus.")
-	defer c.staticLogger.Trace("Exiting updateCachedStatus.")
+// managedUpdateCachedStatus updates the cached status of the skylink - pinned
+// or not.
+func (c *client) managedUpdateCachedStatus(skylink string, pinned bool) {
+	c.staticLogger.Trace("Entering managedUpdateCachedStatus.")
+	defer c.staticLogger.Trace("Exiting managedUpdateCachedStatus.")
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	if pinned {
