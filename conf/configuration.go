@@ -1,11 +1,16 @@
 package conf
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/build"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Default configuration values.
@@ -17,6 +22,12 @@ const (
 	defaultSiaAPIHost   = "10.10.10.10"
 	defaultSiaAPIPort   = "9980"
 	defaultMinPinners   = 1
+)
+
+// Cluster-wide configuration variable names.
+// Stored in the database.
+const (
+	confMinPinners = "min_pinners"
 )
 
 type (
@@ -106,4 +117,23 @@ func LoadConfig() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// MinPinners returns the cluster-wide value of the minimum number of servers we
+// expect to be pinning each skylink.
+func MinPinners(ctx context.Context, db *database.DB) (int, error) {
+	val, err := db.ConfigValue(ctx, confMinPinners)
+	if errors.Contains(err, mongo.ErrNoDocuments) {
+		return defaultMinPinners, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	mp, err := strconv.ParseInt(val, 10, 0)
+	if mp < 1 || mp > 10 {
+		errMsg := fmt.Sprintf("Invalid min_pinners value in database configuration! The value must be between 1 and 10, it was %v.", mp)
+		build.Critical(errMsg)
+		return 0, errors.New(errMsg)
+	}
+	return int(mp), err
 }

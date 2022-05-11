@@ -2,9 +2,11 @@ package workers
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
@@ -87,10 +89,12 @@ type (
 	Scanner struct {
 		staticDB         *database.DB
 		staticLogger     *logrus.Logger
-		staticMinPinners int
 		staticServerName string
 		staticSkydClient skyd.Client
 		staticTG         *threadgroup.ThreadGroup
+
+		minPinners int
+		mu         sync.Mutex
 	}
 )
 
@@ -99,7 +103,7 @@ func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverNa
 	return &Scanner{
 		staticDB:         db,
 		staticLogger:     logger,
-		staticMinPinners: minPinners,
+		minPinners:       minPinners,
 		staticServerName: serverName,
 		staticSkydClient: skydClient,
 		staticTG:         &threadgroup.ThreadGroup{},
@@ -130,6 +134,7 @@ func (s *Scanner) threadedScanAndPin() {
 
 	// Main execution loop, goes on forever while the service is running.
 	for {
+		s.refreshMinPinners()
 		s.pinUnderpinnedSkylinks()
 		// Sleep between database scans.
 		select {
@@ -155,7 +160,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 			return
 		}
 
-		deadlineTimer := s.deadline(skylink)
+		deadlineTimer := s.deadline(skylink.String())
 		defer deadlineTimer.Stop()
 		ticker := time.NewTicker(SleepBetweenHealthChecks)
 		defer ticker.Stop()
@@ -189,9 +194,13 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // findAndPinOneUnderpinnedSkylink scans the database for one skylinks which is
 // either locked by the current server or underpinned. If it finds such a
 // skylink, it pins it to the local skyd. The method returns true until it finds
-// no further skylinks to process.
-func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodules.SiaPath, continueScanning bool) {
-	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
+// no further skylinks to process or until it encounters an unrecoverable error,
+// such as bad credentials, dead skyd, etc.
+func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink, sf skymodules.SiaPath, continueScanning bool) {
+	s.staticLogger.Trace("Entering findAndPinOneUnderpinnedSkylink")
+	defer s.staticLogger.Trace("Exiting findAndPinOneUnderpinnedSkylink")
+
+	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.minPinners)
 	if errors.Contains(err, database.ErrSkylinkNotExist) {
 		// No more underpinned skylinks pinnable by this server.
 		return
@@ -213,7 +222,7 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodul
 		return
 	}
 	s.staticLogger.Debugf("Successfully pinned %s", sl)
-	return sl.String(), sf, true
+	return sl, sf, true
 }
 
 // estimateTimeToFull calculates how long we should sleep after pinning the given
@@ -242,6 +251,19 @@ func (s *Scanner) estimateTimeToFull(skylink string) time.Duration {
 	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*modules.SectorSize
 	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
 	return time.Duration(secondsRemaining) * time.Second
+}
+
+// refreshMinPinners makes sure the local value of min pinners matches the one
+// in the database.
+func (s *Scanner) refreshMinPinners() {
+	mp, err := conf.MinPinners(context.TODO(), s.staticDB)
+	if err != nil {
+		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for min_pinners"))
+		return
+	}
+	s.mu.Lock()
+	s.minPinners = mp
+	s.mu.Unlock()
 }
 
 // SleepBetweenScans defines how often we'll scan the DB for underpinned
