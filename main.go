@@ -38,7 +38,7 @@ func main() {
 	}
 
 	// Start the background scanner.
-	skydClient := skyd.NewClient(cfg.SiaAPIHost, cfg.SiaAPIPort, cfg.SiaAPIPassword)
+	skydClient := skyd.NewClient(cfg.SiaAPIHost, cfg.SiaAPIPort, cfg.SiaAPIPassword, logger)
 	scanner := workers.NewScanner(db, logger, cfg.MinPinners, cfg.ServerName, skydClient)
 	err = scanner.Start()
 	if err != nil {
