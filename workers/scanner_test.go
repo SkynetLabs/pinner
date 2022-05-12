@@ -41,12 +41,12 @@ func TestScanner_calculateSleep(t *testing.T) {
 	scanner := Scanner{
 		staticSkydClient: skydMock,
 	}
-	skylink := test.RandomSkylink().String()
+	skylink := test.RandomSkylink()
 
 	for tname, tt := range tests {
 		// Prepare the mock.
 		meta := skymodules.SkyfileMetadata{Length: tt.dataSize}
-		skydMock.SetMetadata(skylink, meta, nil)
+		skydMock.SetMetadata(skylink.String(), meta, nil)
 
 		sleep := scanner.estimateTimeToFull(skylink)
 		if sleep != tt.expectedSleep {
