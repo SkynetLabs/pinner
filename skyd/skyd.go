@@ -91,7 +91,7 @@ func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
 // Pin instructs the local skyd to pin the given skylink.
 func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 	c.staticLogger.Tracef("Entering Pin. Skylink: '%s'", skylink)
-	defer c.staticLogger.Trace("Exiting Pin.")
+	defer c.staticLogger.Tracef("Exiting Pin. Skylink: '%s'", skylink)
 	_, err := database.SkylinkFromString(skylink)
 	if err != nil {
 		return skymodules.SiaPath{}, errors.Compose(err, database.ErrInvalidSkylink)
@@ -152,15 +152,15 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 // Resolve resolves a V2 skylink to a V1 skylink. Returns an error if the given
 // skylink is not V2.
 func (c *client) Resolve(skylink string) (string, error) {
-	c.staticLogger.Trace("Entering Resolve.")
-	defer c.staticLogger.Trace("Exiting Resolve.")
+	c.staticLogger.Tracef("Entering Resolve. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting Resolve. Skylink: '%s'", skylink)
 	return c.staticClient.ResolveSkylinkV2(skylink)
 }
 
 // Unpin instructs the local skyd to unpin the given skylink.
 func (c *client) Unpin(skylink string) error {
-	c.staticLogger.Trace("Entering Unpin.")
-	defer c.staticLogger.Trace("Exiting Unpin.")
+	c.staticLogger.Tracef("Entering Unpin. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting Unpin. Skylink: '%s'", skylink)
 	err := c.staticClient.SkynetSkylinkUnpinPost(skylink)
 	// Update the cached status of the skylink if there is no error or the error
 	// indicates that the skylink is blocked.
@@ -173,8 +173,8 @@ func (c *client) Unpin(skylink string) error {
 // isPinned checks the list of skylinks pinned by the local skyd for the given
 // skylink and returns true if it finds it.
 func (c *client) isPinned(skylink string) (bool, error) {
-	c.staticLogger.Trace("Entering isPinned.")
-	defer c.staticLogger.Trace("Exiting isPinned.")
+	c.staticLogger.Tracef("Entering isPinned. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting isPinned. Skylink: '%s'", skylink)
 	sls, err := c.PinnedSkylinks()
 	if err != nil {
 		return false, err
@@ -186,8 +186,8 @@ func (c *client) isPinned(skylink string) (bool, error) {
 // managedUpdateCachedStatus updates the cached status of the skylink - pinned
 // or not.
 func (c *client) managedUpdateCachedStatus(skylink string, pinned bool) {
-	c.staticLogger.Trace("Entering managedUpdateCachedStatus.")
-	defer c.staticLogger.Trace("Exiting managedUpdateCachedStatus.")
+	c.staticLogger.Tracef("Entering managedUpdateCachedStatus. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting managedUpdateCachedStatus. Skylink: '%s'", skylink)
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	if pinned {
