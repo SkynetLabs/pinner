@@ -138,11 +138,9 @@ func (c *client) PinnedSkylinks() (map[string]interface{}, error) {
 			}
 		}
 		// Grab all subdirs and queue them for walking.
-		for _, d := range rd.Directories {
-			if d.SiaPath.String() == dir.String() {
-				continue
-			}
-			dirsToWalk = append(dirsToWalk, d.SiaPath)
+		// Skip the first element because that's current directory.
+		for i := 1; i < len(rd.Directories); i++ {
+			dirsToWalk = append(dirsToWalk, rd.Directories[i].SiaPath)
 		}
 	}
 	// Update the cache.
