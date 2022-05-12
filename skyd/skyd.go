@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"gitlab.com/NebulousLabs/errors"
 	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
@@ -16,8 +15,6 @@ var (
 	// skylinksCache is a local cache of the list of skylinks pinned by the
 	// local skyd
 	skylinksCache pinnedSkylinksCache
-	// skylinksCacheTTL defines the duration of skylinksCache
-	skylinksCacheTTL = time.Hour
 )
 
 type (
@@ -40,9 +37,8 @@ type (
 	// so we don't need to fetch that for each skylink we potentially want to
 	// pin/unpin.
 	pinnedSkylinksCache struct {
-		expiration time.Time
-		skylinks   map[string]interface{}
-		mu         sync.Mutex
+		skylinks map[string]interface{}
+		mu       sync.Mutex
 	}
 )
 
@@ -129,7 +125,6 @@ func (c *client) RebuildCache() error {
 	skylinksCache.mu.Lock()
 	defer skylinksCache.mu.Unlock()
 	skylinksCache.skylinks = sls
-	skylinksCache.expiration = time.Now().UTC().Add(skylinksCacheTTL)
 	return nil
 }
 
