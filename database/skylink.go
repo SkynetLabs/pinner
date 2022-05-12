@@ -89,6 +89,8 @@ func (db *DB) FindSkylink(ctx context.Context, skylink skymodules.Skylink) (Skyl
 // MarkPinned marks a skylink as pinned (or no longer unpinned), meaning
 // that Pinner should make sure it's pinned by the minimum number of servers.
 func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error {
+	db.staticLogger.Tracef("Entering MarkPinned. Skylink: '%s'", skylink)
+	defer db.staticLogger.Trace("Exiting MarkPinned.")
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"unpin": false}}
 	opts := options.Update().SetUpsert(true)
@@ -99,6 +101,8 @@ func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error 
 // MarkUnpinned marks a skylink as unpinned, meaning that all servers
 // should stop pinning it.
 func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) error {
+	db.staticLogger.Tracef("Entering MarkUnpinned. Skylink: '%s'", skylink)
+	defer db.staticLogger.Trace("Exiting MarkUnpinned.")
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"unpin": true}}
 	opts := options.Update().SetUpsert(true)
@@ -117,6 +121,8 @@ func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) erro
 // that because we know that a user is pinning it but not so if we are running
 // a server sweep and documenting which skylinks are pinned by this server.
 func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylink, server string, markPinned bool) error {
+	db.staticLogger.Tracef("Entering AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
+	defer db.staticLogger.Trace("Exiting AddServerForSkylink.")
 	filter := bson.M{"skylink": skylink.String()}
 	var update bson.M
 	if markPinned {
@@ -136,6 +142,8 @@ func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylin
 // pinning this skylink. If the skylink does not exist in the database it will
 // not be inserted.
 func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
+	db.staticLogger.Tracef("Entering RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
+	defer db.staticLogger.Trace("Exiting RemoveServerFromSkylink.")
 	filter := bson.M{
 		"skylink": skylink.String(),
 		"servers": server,

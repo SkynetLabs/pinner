@@ -7,6 +7,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -38,22 +39,14 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	sl, err := database.SkylinkFromString(body.Skylink)
-	if err != nil {
+	sl, err := api.parseAndResolve(body.Skylink)
+	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
 		return
 	}
-	if sl.IsSkylinkV2() {
-		s, err := api.staticSkydClient.Resolve(sl.String())
-		if err != nil {
-			api.WriteError(w, err, http.StatusInternalServerError)
-			return
-		}
-		err = sl.LoadString(s)
-		if err != nil {
-			api.WriteError(w, err, http.StatusInternalServerError)
-			return
-		}
+	if err != nil {
+		api.WriteError(w, err, http.StatusInternalServerError)
+		return
 	}
 	// Create the skylink.
 	_, err = api.staticDB.CreateSkylink(req.Context(), sl, api.staticServerName)
@@ -78,22 +71,14 @@ func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter
 		api.WriteError(w, err, http.StatusBadRequest)
 		return
 	}
-	sl, err := database.SkylinkFromString(body.Skylink)
-	if err != nil {
+	sl, err := api.parseAndResolve(body.Skylink)
+	if errors.Contains(err, database.ErrInvalidSkylink) {
 		api.WriteError(w, database.ErrInvalidSkylink, http.StatusBadRequest)
 		return
 	}
-	if sl.IsSkylinkV2() {
-		s, err := api.staticSkydClient.Resolve(sl.String())
-		if err != nil {
-			api.WriteError(w, err, http.StatusInternalServerError)
-			return
-		}
-		err = sl.LoadString(s)
-		if err != nil {
-			api.WriteError(w, err, http.StatusInternalServerError)
-			return
-		}
+	if err != nil {
+		api.WriteError(w, err, http.StatusInternalServerError)
+		return
 	}
 	err = api.staticDB.MarkUnpinned(req.Context(), sl)
 	if err != nil {
@@ -106,5 +91,29 @@ func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter
 // sweepPOST instructs pinner to scan the list of skylinks pinned by skyd and
 // update its database.
 func (api *API) sweepPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	// TODO This should update both skylinks which are pinned but are not marked
+	//  as pinned by the local server and skylinks which are marked as pinned
+	//  but no longer are.
 	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
+}
+
+// parseAndResolve parses the given string representation of a skylink and
+// resolves it to a V1 skylink, in case it's a V2.
+func (api *API) parseAndResolve(skylink string) (skymodules.Skylink, error) {
+	var sl skymodules.Skylink
+	err := sl.LoadString(skylink)
+	if err != nil {
+		return skymodules.Skylink{}, errors.Compose(err, database.ErrInvalidSkylink)
+	}
+	if sl.IsSkylinkV2() {
+		s, err := api.staticSkydClient.Resolve(sl.String())
+		if err != nil {
+			return skymodules.Skylink{}, err
+		}
+		err = sl.LoadString(s)
+		if err != nil {
+			return skymodules.Skylink{}, err
+		}
+	}
+	return sl, nil
 }

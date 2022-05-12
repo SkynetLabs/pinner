@@ -2,6 +2,8 @@ package workers
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -65,7 +67,7 @@ var (
 		// In production we want to use a prime number of hours, so we can
 		// de-sync the scan and the sweeps.
 		Standard: 19 * time.Hour,
-		Dev:      10 * time.Second,
+		Dev:      1 * time.Minute,
 		Testing:  100 * time.Millisecond,
 	}).(time.Duration)
 	// sleepBetweenScansVariation defines how much the sleep between scans will
@@ -135,6 +137,7 @@ func (s *Scanner) threadedScanAndPin() {
 		select {
 		case <-time.After(SleepBetweenScans()):
 		case <-s.staticTG.StopChan():
+			s.staticLogger.Trace("Stopping scanner.")
 			return
 		}
 	}
@@ -142,10 +145,13 @@ func (s *Scanner) threadedScanAndPin() {
 
 // pinUnderpinnedSkylinks loops over all underpinned skylinks and pins them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
+	s.staticLogger.Trace("Entering pinUnderpinnedSkylinks.")
+	defer s.staticLogger.Trace("Exiting pinUnderpinnedSkylinks.")
 	for {
 		// Check for service shutdown before talking to the DB.
 		select {
 		case <-s.staticTG.StopChan():
+			s.staticLogger.Trace("Stop channel closed.")
 			return
 		default:
 		}
@@ -162,15 +168,19 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // findAndPinOneUnderpinnedSkylink scans the database for one skylinks which is
 // either locked by the current server or underpinned. If it finds such a
 // skylink, it pins it to the local skyd. The method returns true until it finds
-// no further skylinks to process.
-func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodules.SiaPath, continueScanning bool) {
+// no further skylinks to process or until it encounters an unrecoverable error,
+// such as bad credentials, dead skyd, etc.
+func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skymodules.Skylink, skymodules.SiaPath, bool) {
+	s.staticLogger.Trace("Entering findAndPinOneUnderpinnedSkylink")
+	defer s.staticLogger.Trace("Exiting findAndPinOneUnderpinnedSkylink")
+
 	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
 	if database.IsNoSkylinksNeedPinning(err) {
-		return
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false
 	}
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch underpinned skylink"))
-		return
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false
 	}
 	defer func() {
 		err = s.staticDB.UnlockSkylink(context.TODO(), sl, s.staticServerName)
@@ -178,14 +188,35 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodul
 			s.staticLogger.Debug(errors.AddContext(err, "failed to unlock skylink after trying to pin it"))
 		}
 	}()
-	sf, err = s.staticSkydClient.Pin(sl.String())
-	if err != nil {
-		s.staticLogger.Warn(errors.AddContext(err, "failed to pin skylink"))
-		continueScanning = true
-		return
+
+	sf, err := s.staticSkydClient.Pin(sl.String())
+	if errors.Contains(err, skyd.ErrSkylinkAlreadyPinned) {
+		s.staticLogger.Info(err)
+		// The skylink is already pinned locally but it's not marked as such.
+		err = s.staticDB.AddServerForSkylink(context.TODO(), sl, s.staticServerName, false)
+		if err != nil {
+			s.staticLogger.Debug(errors.AddContext(err, "failed to mark as pinned by this server"))
+		}
+		return skymodules.Skylink{}, skymodules.SiaPath{}, true
 	}
-	s.staticLogger.Debugf("Successfully pinned %s", sl)
-	return sl.String(), sf, true
+	if err != nil && (strings.Contains(err.Error(), "API authentication failed.") ||
+		strings.Contains(err.Error(), "connect: connection refused")) {
+		err = errors.AddContext(err, fmt.Sprintf("unrecoverable error while pinning '%s'", sl))
+		s.staticLogger.Error(err)
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false
+	}
+	if err != nil {
+		s.staticLogger.Warn(errors.AddContext(err, fmt.Sprintf("failed to pin '%s'", sl)))
+		// Since this is not an unrecoverable error, we'll signal the caller to
+		// continue trying to pin other skylinks.
+		return skymodules.Skylink{}, skymodules.SiaPath{}, true
+	}
+	s.staticLogger.Infof("Successfully pinned '%s'", sl)
+	err = s.staticDB.AddServerForSkylink(context.TODO(), sl, s.staticServerName, false)
+	if err != nil {
+		s.staticLogger.Debug(errors.AddContext(err, "failed to mark as pinned by this server"))
+	}
+	return sl, sf, true
 }
 
 // estimateTimeToFull calculates how long we should sleep after pinning the given
@@ -196,8 +227,8 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink string, sf skymodul
 // * assumes lazy pinning, meaning that none of the fanout is uploaded
 // * all skyfiles are assumed to be large files (base sector + fanout) and the
 //	metadata is assumed to fill up the base sector (to err on the safe side)
-func (s *Scanner) estimateTimeToFull(skylink string) time.Duration {
-	meta, err := s.staticSkydClient.Metadata(skylink)
+func (s *Scanner) estimateTimeToFull(skylink skymodules.Skylink) time.Duration {
+	meta, err := s.staticSkydClient.Metadata(skylink.String())
 	if err != nil {
 		err = errors.AddContext(err, "failed to get metadata for skylink")
 		s.staticLogger.Error(err)
@@ -218,7 +249,7 @@ func (s *Scanner) estimateTimeToFull(skylink string) time.Duration {
 
 // waitUntilHealthy blocks until the given skylinks becomes fully healthy or a
 // timeout occurs.
-func (s *Scanner) waitUntilHealthy(skylink string, sp skymodules.SiaPath) {
+func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.SiaPath) {
 	deadlineTimer := s.deadline(skylink)
 	defer deadlineTimer.Stop()
 	ticker := time.NewTicker(SleepBetweenHealthChecks)
@@ -259,6 +290,6 @@ func SleepBetweenScans() time.Duration {
 // deadline calculates how much we are willing to wait for a skylink to be fully
 // healthy before giving up. It's twice the expected time, as returned by
 // estimateTimeToFull.
-func (s *Scanner) deadline(skylink string) *time.Timer {
+func (s *Scanner) deadline(skylink skymodules.Skylink) *time.Timer {
 	return time.NewTimer(2 * s.estimateTimeToFull(skylink))
 }
