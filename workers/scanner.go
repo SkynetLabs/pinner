@@ -132,6 +132,16 @@ func (s *Scanner) threadedScanAndPin() {
 
 	// Main execution loop, goes on forever while the service is running.
 	for {
+		// Check for service shutdown before talking to the DB.
+		select {
+		case <-s.staticTG.StopChan():
+			return
+		default:
+		}
+		err := s.staticSkydClient.RebuildCache()
+		if err != nil {
+			s.staticLogger.Warn(errors.AddContext(err, "failed to rebuild skyd client cache"))
+		}
 		s.pinUnderpinnedSkylinks()
 		// Sleep between database scans.
 		select {

@@ -71,7 +71,12 @@ func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]interface{}, err 
 	return nil, c.pinnedSkylinksError
 }
 
-// Resolve is a mock.
+// RebuildCache is a noop mock.
+func (c *SkydClientMock) RebuildCache() error {
+	return nil
+}
+
+// Resolve is a noop mock.
 func (c *SkydClientMock) Resolve(skylink string) (string, error) {
 	return skylink, nil
 }
