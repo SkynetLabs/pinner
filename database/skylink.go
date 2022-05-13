@@ -25,6 +25,9 @@ var (
 	// ErrNoSkylinksLocked is returned when we try to lock underpinned skylinks
 	// for pinning but we fail to do so.
 	ErrNoSkylinksLocked = errors.New("no skylinks locked")
+	// ErrNoUnderpinnedSkylinks is returned when all skylinks in the database
+	// are either sufficiently pinned or pinned by the local server.
+	ErrNoUnderpinnedSkylinks = errors.New("no underpinned skylinks found")
 	// LockDuration defines the duration of a database lock. We lock skylinks
 	// while we are trying to pin them to a new server. The goal is to only
 	// allow a single server to pin a given skylink at a time.
@@ -87,7 +90,7 @@ func (db *DB) FindSkylink(ctx context.Context, skylink skymodules.Skylink) (Skyl
 // that Pinner should make sure it's pinned by the minimum number of servers.
 func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error {
 	db.staticLogger.Tracef("Entering MarkPinned. Skylink: '%s'", skylink)
-	defer db.staticLogger.Trace("Exiting MarkPinned.")
+	defer db.staticLogger.Tracef("Exiting MarkPinned. Skylink: '%s'", skylink)
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"unpin": false}}
 	opts := options.Update().SetUpsert(true)
@@ -99,7 +102,7 @@ func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error 
 // should stop pinning it.
 func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) error {
 	db.staticLogger.Tracef("Entering MarkUnpinned. Skylink: '%s'", skylink)
-	defer db.staticLogger.Trace("Exiting MarkUnpinned.")
+	defer db.staticLogger.Tracef("Exiting MarkUnpinned. Skylink: '%s'", skylink)
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"unpin": true}}
 	opts := options.Update().SetUpsert(true)
@@ -119,7 +122,7 @@ func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) erro
 // a server sweep and documenting which skylinks are pinned by this server.
 func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylink, server string, markPinned bool) error {
 	db.staticLogger.Tracef("Entering AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Trace("Exiting AddServerForSkylink.")
+	defer db.staticLogger.Tracef("Exiting AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
 	filter := bson.M{"skylink": skylink.String()}
 	var update bson.M
 	if markPinned {
@@ -140,7 +143,7 @@ func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylin
 // not be inserted.
 func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
 	db.staticLogger.Tracef("Entering RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Trace("Exiting RemoveServerFromSkylink.")
+	defer db.staticLogger.Tracef("Exiting RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
 	filter := bson.M{
 		"skylink": skylink.String(),
 		"servers": server,
@@ -186,7 +189,7 @@ func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinn
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	sr := db.staticDB.Collection(collSkylinks).FindOneAndUpdate(ctx, filter, update, opts)
 	if sr.Err() == mongo.ErrNoDocuments {
-		return skymodules.Skylink{}, ErrSkylinkNotExist
+		return skymodules.Skylink{}, ErrNoUnderpinnedSkylinks
 	}
 	if sr.Err() != nil {
 		return skymodules.Skylink{}, sr.Err()
@@ -204,6 +207,8 @@ func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinn
 // UnlockSkylink removes the lock on the skylink put while we're trying to pin
 // it to a new server.
 func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
+	db.staticLogger.Tracef("Entering UnlockSkylink. Skylink: '%s', server: '%s'", skylink, server)
+	defer db.staticLogger.Tracef("Exiting UnlockSkylink. Skylink: '%s', server: '%s'", skylink, server)
 	filter := bson.M{
 		"skylink":   skylink.String(),
 		"locked_by": server,
@@ -219,6 +224,12 @@ func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, ser
 		return ErrNoSkylinksLocked
 	}
 	return err
+}
+
+// IsNoSkylinksNeedPinning returns true when the given error indicates that
+// there are no more skylinks that need to be pinned by the current server.
+func IsNoSkylinksNeedPinning(err error) bool {
+	return errors.Contains(err, ErrNoUnderpinnedSkylinks)
 }
 
 // SkylinkFromString converts a string to a Skylink.

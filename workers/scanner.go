@@ -170,39 +170,8 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 		if !continueScanning {
 			return
 		}
-		if sp.IsEmpty() {
-			continue
-		}
-
-		deadlineTimer := s.deadline(skylink)
-		defer deadlineTimer.Stop()
-		ticker := time.NewTicker(SleepBetweenHealthChecks)
-		defer ticker.Stop()
-
-		// Wait for the pinned file to become fully healthy.
-		for {
-			health, err := s.staticSkydClient.FileHealth(sp)
-			if err != nil {
-				err = errors.AddContext(err, "failed to get sia file's health")
-				s.staticLogger.Error(err)
-				build.Critical(err)
-				break
-			}
-			if health == 0 {
-				// The file is now fully uploaded and healthy.
-				break
-			}
-			select {
-			case <-ticker.C:
-				s.staticLogger.Tracef("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
-			case <-deadlineTimer.C:
-				s.staticLogger.Warnf("Skylink '%s' failed to reach full health within the time limit.", skylink)
-				break
-			case <-s.staticTG.StopChan():
-				s.staticLogger.Trace("Stop channel closed.")
-				return
-			}
-		}
+		// Block until the pinned skylink becomes healthy or until a timeout.
+		s.waitUntilHealthy(skylink, sp)
 	}
 }
 
@@ -216,9 +185,7 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skymodules.Skylink, skymodu
 	defer s.staticLogger.Trace("Exiting findAndPinOneUnderpinnedSkylink")
 
 	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.staticMinPinners)
-	if errors.Contains(err, database.ErrSkylinkNotExist) {
-		// No more underpinned skylinks pinnable by this server.
-		s.staticLogger.Trace("No underpinned skylinks found.")
+	if database.IsNoSkylinksNeedPinning(err) {
 		return skymodules.Skylink{}, skymodules.SiaPath{}, false
 	}
 	if err != nil {
@@ -288,6 +255,39 @@ func (s *Scanner) estimateTimeToFull(skylink skymodules.Skylink) time.Duration {
 	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*modules.SectorSize
 	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
 	return time.Duration(secondsRemaining) * time.Second
+}
+
+// waitUntilHealthy blocks until the given skylinks becomes fully healthy or a
+// timeout occurs.
+func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.SiaPath) {
+	deadlineTimer := s.deadline(skylink)
+	defer deadlineTimer.Stop()
+	ticker := time.NewTicker(SleepBetweenHealthChecks)
+	defer ticker.Stop()
+
+	// Wait for the pinned file to become fully healthy.
+	for {
+		health, err := s.staticSkydClient.FileHealth(sp)
+		if err != nil {
+			err = errors.AddContext(err, "failed to get sia file's health")
+			s.staticLogger.Error(err)
+			build.Critical(err)
+			break
+		}
+		if health == 0 {
+			// The file is now fully uploaded and healthy.
+			break
+		}
+		select {
+		case <-ticker.C:
+			s.staticLogger.Tracef("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
+		case <-deadlineTimer.C:
+			s.staticLogger.Warnf("Skylink '%s' failed to reach full health within the time limit.", skylink)
+			break
+		case <-s.staticTG.StopChan():
+			return
+		}
+	}
 }
 
 // SleepBetweenScans defines how often we'll scan the DB for underpinned
