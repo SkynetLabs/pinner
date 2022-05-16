@@ -30,6 +30,20 @@ const (
 	confMinPinners = "min_pinners"
 )
 
+const (
+	// minPinnersMinValue is the lowest allowed value for the number of pinners
+	// we want to be pinning each skylink. We don't go under 1 because if you
+	// don't want to ensure that skylinks are being pinned, you shouldn't be
+	// running this service in the first place.
+	minPinnersMinValue = 1
+	// maxPinnersMinValue is the highest allowed value for the number of pinners
+	// we want to be pinning each skylink. We want to limit the max number here
+	// because raising this number has direct financial consequences for the
+	// portal operator. The number 10 was arbitrarily chosen as an acceptable
+	// upper bound.
+	maxPinnersMinValue = 10
+)
+
 type (
 	// Config represents the entire configurable state of the service. If a
 	// value is not here, then it can't be configured.
@@ -133,8 +147,8 @@ func MinPinners(ctx context.Context, db *database.DB) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if mp < 1 || mp > 10 {
-		errMsg := fmt.Sprintf("Invalid min_pinners value in database configuration! The value must be between 1 and 10, it was %v.", mp)
+	if mp < minPinnersMinValue || mp > maxPinnersMinValue {
+		errMsg := fmt.Sprintf("Invalid min_pinners value in database configuration! The value must be between %d and %d, it was %v.", mp, minPinnersMinValue, maxPinnersMinValue)
 		build.Critical(errMsg)
 		return 0, errors.New(errMsg)
 	}
