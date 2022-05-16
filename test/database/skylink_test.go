@@ -322,3 +322,105 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 		t.Fatalf("Expected '%v', got '%v'", database.ErrNoUnderpinnedSkylinks, err)
 	}
 }
+
+// TestSkylinksPerServer ensures that SkylinksPerServer works as expected.
+func TestSkylinksPerServer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	ctx := context.Background()
+	db, err := test.NewDatabase(ctx, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sl1 := test.RandomSkylink()
+	sl2 := test.RandomSkylink()
+
+	srv1 := "server1"
+	srv2 := "server2"
+
+	// List all skylinks pinned by svr1. Expect an empty list.
+	ls, err := db.SkylinksPerServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ls) != 0 {
+		t.Fatalf("Expected empty list, got %d entries: %+v", len(ls), ls)
+	}
+	// Add a skylink.
+	_, err = db.CreateSkylink(ctx, sl1, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure it shows up on the list.
+	ls, err = db.SkylinksPerServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(ls, sl1.String()) {
+		t.Fatalf("Expected a list containing only %s but got %+v", sl1.String(), ls)
+	}
+	// Add another skylink.
+	_, err = db.CreateSkylink(ctx, sl2, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure it shows up on the list.
+	ls, err = db.SkylinksPerServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(ls, sl1.String()) || !contains(ls, sl2.String()) {
+		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
+	}
+	// Add a second server to sl1 and expect it to still show up on the list.
+	err = db.AddServerForSkylink(ctx, sl1, srv2, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ls, err = db.SkylinksPerServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(ls, sl1.String()) {
+		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
+	}
+	// Remove srv1 as pinner for both sl1 and sl2.
+	err = db.RemoveServerFromSkylink(ctx, sl1, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.RemoveServerFromSkylink(ctx, sl2, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Expect an empty list for srv1.
+	ls, err = db.SkylinksPerServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ls) != 0 {
+		t.Fatalf("Expected empty list, got %d entries: %+v", len(ls), ls)
+	}
+	// Expect sl1 to still appear in the list of srv2.
+	ls, err = db.SkylinksPerServer(ctx, srv2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(ls, sl1.String()) {
+		t.Fatalf("Expected a list containing only %s but got %+v", sl1.String(), ls)
+	}
+}
+
+// contains checks whether a slice of strings contains a given string.
+func contains(ss []string, s string) bool {
+	for _, str := range ss {
+		if str == s {
+			return true
+		}
+	}
+	return false
+}
