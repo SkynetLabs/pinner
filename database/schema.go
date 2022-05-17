@@ -32,8 +32,8 @@ func schema() map[string][]mongo.IndexModel {
 				Options: options.Index().SetName("servers"),
 			},
 			{
-				Keys:    bson.D{{"unpin", 1}},
-				Options: options.Index().SetName("unpin"),
+				Keys:    bson.D{{"pinned", 1}},
+				Options: options.Index().SetName("pinned"),
 			},
 		},
 		collConfig: {

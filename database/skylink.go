@@ -40,9 +40,11 @@ type (
 		ID      primitive.ObjectID `bson:"_id,omitempty"`
 		Skylink string             `bson:"skylink"`
 		Servers []string           `bson:"servers"`
-		// Unpin informs all servers that there are no users pinning this
-		// skylink and they should stop pinning it as well.
-		Unpin       bool      `bson:"unpin"`
+		// Pinned tells us that at least one user is actively pinning this
+		// skylink and we want to keep it alive. If Pinned is false then all
+		// servers should actively unpin the skylink and stop paying for it.
+		// This is not yet implemented.
+		Pinned      bool      `bson:"pinned"`
 		LockedBy    string    `bson:"locked_by"`
 		LockExpires time.Time `bson:"lock_expires"`
 	}
@@ -74,6 +76,7 @@ func (db *DB) CreateSkylink(ctx context.Context, skylink skymodules.Skylink, ser
 	s := Skylink{
 		Skylink: skylink.String(),
 		Servers: []string{server},
+		Pinned:  true,
 	}
 	ir, err := db.staticDB.Collection(collSkylinks).InsertOne(ctx, s)
 	if mongo.IsDuplicateKeyError(err) {
@@ -109,7 +112,7 @@ func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error 
 	db.staticLogger.Tracef("Entering MarkPinned. Skylink: '%s'", skylink)
 	defer db.staticLogger.Tracef("Exiting MarkPinned. Skylink: '%s'", skylink)
 	filter := bson.M{"skylink": skylink.String()}
-	update := bson.M{"$set": bson.M{"unpin": false}}
+	update := bson.M{"$set": bson.M{"pinned": true}}
 	opts := options.Update().SetUpsert(true)
 	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err
@@ -121,7 +124,7 @@ func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) erro
 	db.staticLogger.Tracef("Entering MarkUnpinned. Skylink: '%s'", skylink)
 	defer db.staticLogger.Tracef("Exiting MarkUnpinned. Skylink: '%s'", skylink)
 	filter := bson.M{"skylink": skylink.String()}
-	update := bson.M{"$set": bson.M{"unpin": true}}
+	update := bson.M{"$set": bson.M{"pinned": false}}
 	opts := options.Update().SetUpsert(true)
 	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
 	return err
@@ -145,7 +148,7 @@ func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylin
 	if markPinned {
 		update = bson.M{
 			"$addToSet": bson.M{"servers": server},
-			"$set":      bson.M{"unpin": false},
+			"$set":      bson.M{"pinned": true},
 		}
 	} else {
 		update = bson.M{"$addToSet": bson.M{"servers": server}}
@@ -176,7 +179,7 @@ func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Sk
 //
 // The MongoDB query is this:
 // db.getCollection('skylinks').find({
-//     "unpin": false,
+//     "pinned": true,
 //     "$expr": { "$lt": [{ "$size": "$servers" }, 2 ]},
 //     "servers": { "$nin": [ "ro-tex.siasky.ivo.NOPE" ]},
 //     "$or": [
@@ -186,7 +189,9 @@ func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Sk
 // })
 func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinners int) (skymodules.Skylink, error) {
 	filter := bson.M{
-		"unpin": false,
+		// We use pinned != false because pinned == true is the default but it's
+		// possible that we've missed setting that somewhere.
+		"pinned": bson.M{"$ne": false},
 		// Pinned by fewer than the minimum number of servers.
 		"$expr": bson.M{"$lt": bson.A{bson.M{"$size": "$servers"}, minPinners}},
 		// Not pinned by the given server.
