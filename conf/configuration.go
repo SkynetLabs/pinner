@@ -1,11 +1,16 @@
 package conf
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/build"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Default configuration values.
@@ -17,6 +22,26 @@ const (
 	defaultSiaAPIHost   = "10.10.10.10"
 	defaultSiaAPIPort   = "9980"
 	defaultMinPinners   = 1
+)
+
+// Cluster-wide configuration variable names.
+// Stored in the database.
+const (
+	confMinPinners = "min_pinners"
+)
+
+const (
+	// minPinnersMinValue is the lowest allowed value for the number of pinners
+	// we want to be pinning each skylink. We don't go under 1 because if you
+	// don't want to ensure that skylinks are being pinned, you shouldn't be
+	// running this service in the first place.
+	minPinnersMinValue = 1
+	// maxPinnersMinValue is the highest allowed value for the number of pinners
+	// we want to be pinning each skylink. We want to limit the max number here
+	// because raising this number has direct financial consequences for the
+	// portal operator. The number 10 was arbitrarily chosen as an acceptable
+	// upper bound.
+	maxPinnersMinValue = 10
 )
 
 type (
@@ -106,4 +131,26 @@ func LoadConfig() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// MinPinners returns the cluster-wide value of the minimum number of servers we
+// expect to be pinning each skylink.
+func MinPinners(ctx context.Context, db *database.DB) (int, error) {
+	val, err := db.ConfigValue(ctx, confMinPinners)
+	if errors.Contains(err, mongo.ErrNoDocuments) {
+		return defaultMinPinners, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	mp, err := strconv.ParseInt(val, 10, 0)
+	if err != nil {
+		return 0, err
+	}
+	if mp < minPinnersMinValue || mp > maxPinnersMinValue {
+		errMsg := fmt.Sprintf("Invalid min_pinners value in database configuration! The value must be between %d and %d, it was %v.", mp, minPinnersMinValue, maxPinnersMinValue)
+		build.Critical(errMsg)
+		return 0, errors.New(errMsg)
+	}
+	return int(mp), nil
 }

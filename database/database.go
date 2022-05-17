@@ -21,6 +21,9 @@ var (
 
 	// dbName defines the name of the database this service uses
 	dbName = "pinner"
+	// collConfig defines the name of the collection which will hold the
+	// cluster-wide service configuration.
+	collConfig = "configuration"
 	// collSkylinks defines the name of the collection which will hold
 	// information about skylinks
 	collSkylinks = "skylinks"
