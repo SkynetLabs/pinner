@@ -141,16 +141,16 @@ func MinPinners(ctx context.Context, db *database.DB) (int, error) {
 		return defaultMinPinners, nil
 	}
 	if err != nil {
-		return 0, err
+		return defaultMinPinners, err
 	}
 	mp, err := strconv.ParseInt(val, 10, 0)
 	if err != nil {
-		return 0, err
+		return defaultMinPinners, err
 	}
 	if mp < minPinnersMinValue || mp > maxPinnersMinValue {
 		errMsg := fmt.Sprintf("Invalid min_pinners value in database configuration! The value must be between %d and %d, it was %v.", mp, minPinnersMinValue, maxPinnersMinValue)
 		build.Critical(errMsg)
-		return 0, errors.New(errMsg)
+		return defaultMinPinners, errors.New(errMsg)
 	}
 	return int(mp), nil
 }
