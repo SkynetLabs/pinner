@@ -36,5 +36,11 @@ func schema() map[string][]mongo.IndexModel {
 				Options: options.Index().SetName("unpin"),
 			},
 		},
+		collConfig: {
+			{
+				Keys:    bson.D{{"key", 1}},
+				Options: options.Index().SetName("key").SetUnique(true),
+			},
+		},
 	}
 }
