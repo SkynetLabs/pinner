@@ -3,10 +3,12 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/build"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
@@ -89,12 +91,67 @@ func (api *API) unpinPOST(w http.ResponseWriter, req *http.Request, _ httprouter
 }
 
 // sweepPOST instructs pinner to scan the list of skylinks pinned by skyd and
-// update its database.
-func (api *API) sweepPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	// TODO This should update both skylinks which are pinned but are not marked
-	//  as pinned by the local server and skylinks which are marked as pinned
-	//  but no longer are.
-	api.WriteError(w, errors.New("unimplemented"), http.StatusTeapot)
+// update its database. This is a very heavy call! Use with caution!
+func (api *API) sweepPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+
+	// Rebuild cache in a goroutine
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	var cacheErr error
+	go func() {
+		defer wg.Done()
+		cacheErr = api.staticSkydClient.RebuildCache()
+	}()
+
+	// Get pinned skylinks from the DB
+	dbSkylinks, err := api.staticDB.SkylinksForServer(req.Context(), api.staticServerName)
+	if err != nil {
+		api.WriteError(w, err, http.StatusInternalServerError)
+		return
+	}
+	wg.Wait()
+	if cacheErr != nil {
+		api.WriteError(w, cacheErr, http.StatusInternalServerError)
+		return
+	}
+
+	unknown, missing := api.staticSkydClient.DiffPinnedSkylinks(dbSkylinks)
+
+	ctx := req.Context()
+	// Remove all unknown skylink from the database.
+	for _, sl := range unknown {
+		s, err := database.SkylinkFromString(sl)
+		if err != nil {
+			err = errors.AddContext(err, "invalid skylink found in DB")
+			build.Critical(err)
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
+		err = api.staticDB.RemoveServerFromSkylink(ctx, s, api.staticServerName)
+		if err != nil {
+			api.WriteError(w, errors.AddContext(err, "failed to unpin skylink"), http.StatusInternalServerError)
+			return
+		}
+	}
+	// Add all missing skylinks to the database.
+	for _, sl := range missing {
+		s, err := database.SkylinkFromString(sl)
+		if err != nil {
+			err = errors.AddContext(err, "invalid skylink reported by skyd")
+			build.Critical(err)
+			api.WriteError(w, err, http.StatusInternalServerError)
+			return
+		}
+		err = api.staticDB.AddServerForSkylink(ctx, s, api.staticServerName, false)
+		if err != nil {
+			api.WriteError(w, errors.AddContext(err, "failed to unpin skylink"), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	api.WriteSuccess(w)
 }
 
 // parseAndResolve parses the given string representation of a skylink and

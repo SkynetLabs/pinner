@@ -323,7 +323,7 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 	}
 }
 
-// TestSkylinksPerServer ensures that SkylinksPerServer works as expected.
+// TestSkylinksPerServer ensures that SkylinksForServer works as expected.
 func TestSkylinksPerServer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -343,7 +343,7 @@ func TestSkylinksPerServer(t *testing.T) {
 	srv2 := "server2"
 
 	// List all skylinks pinned by svr1. Expect an empty list.
-	ls, err := db.SkylinksPerServer(ctx, srv1)
+	ls, err := db.SkylinksForServer(ctx, srv1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestSkylinksPerServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Make sure it shows up on the list.
-	ls, err = db.SkylinksPerServer(ctx, srv1)
+	ls, err = db.SkylinksForServer(ctx, srv1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestSkylinksPerServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Make sure it shows up on the list.
-	ls, err = db.SkylinksPerServer(ctx, srv1)
+	ls, err = db.SkylinksForServer(ctx, srv1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,7 +381,7 @@ func TestSkylinksPerServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ls, err = db.SkylinksPerServer(ctx, srv1)
+	ls, err = db.SkylinksForServer(ctx, srv1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestSkylinksPerServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Expect an empty list for srv1.
-	ls, err = db.SkylinksPerServer(ctx, srv1)
+	ls, err = db.SkylinksForServer(ctx, srv1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +406,7 @@ func TestSkylinksPerServer(t *testing.T) {
 		t.Fatalf("Expected empty list, got %d entries: %+v", len(ls), ls)
 	}
 	// Expect sl1 to still appear in the list of srv2.
-	ls, err = db.SkylinksPerServer(ctx, srv2)
+	ls, err = db.SkylinksForServer(ctx, srv2)
 	if err != nil {
 		t.Fatal(err)
 	}
