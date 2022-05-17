@@ -179,7 +179,7 @@ func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Sk
 //
 // The MongoDB query is this:
 // db.getCollection('skylinks').find({
-//     "pinned": true,
+//     "pinned": { "$ne": false }},
 //     "$expr": { "$lt": [{ "$size": "$servers" }, 2 ]},
 //     "servers": { "$nin": [ "ro-tex.siasky.ivo.NOPE" ]},
 //     "$or": [
