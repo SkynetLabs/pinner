@@ -13,27 +13,24 @@ var (
 	// ErrRebuildInProgress is returned when we try to start a rebuild and one
 	// is already in progress.
 	ErrRebuildInProgress = errors.New("rebuild in progress")
-
-	// skylinksCache is a singleton cache, initialised on module load.
-	skylinksCache *pinnedSkylinksCache
 )
 
 type (
-	// pinnedSkylinksCache is a simple cache of the renter's directory
+	// PinnedSkylinksCache is a simple cache of the renter's directory
 	// information, so we don't need to fetch that for each skylink we
 	// potentially want to pin/unpin.
-	pinnedSkylinksCache struct {
+	PinnedSkylinksCache struct {
 		rebuildCh chan interface{}
-		skylinks  map[string]interface{}
+		skylinks  map[string]struct{}
 		mu        sync.Mutex
 	}
 )
 
-// init initialises the singleton cache variable.
-func init() {
+// NewCache returns a new cache instance.
+func NewCache() *PinnedSkylinksCache {
 	closedCh := make(chan interface{})
 	close(closedCh)
-	skylinksCache = &pinnedSkylinksCache{
+	return &PinnedSkylinksCache{
 		rebuildCh: closedCh,
 		skylinks:  nil,
 		mu:        sync.Mutex{},
@@ -41,17 +38,17 @@ func init() {
 }
 
 // Add registers the given skylink in the cache.
-func (psc *pinnedSkylinksCache) Add(skylink string) {
+func (psc *PinnedSkylinksCache) Add(skylink string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 	if psc.skylinks == nil {
-		psc.skylinks = make(map[string]interface{})
+		psc.skylinks = make(map[string]struct{})
 	}
 	psc.skylinks[skylink] = struct{}{}
 }
 
 // Contains returns true when the given skylink is in the cache.
-func (psc *pinnedSkylinksCache) Contains(skylink string) bool {
+func (psc *PinnedSkylinksCache) Contains(skylink string) bool {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 	_, exists := psc.skylinks[skylink]
@@ -61,11 +58,11 @@ func (psc *pinnedSkylinksCache) Contains(skylink string) bool {
 // Diff returns two lists of skylinks - the ones that are in the given list but
 // are not in the cache (missing) and the ones that are in the cache but are not
 // in the given list (removed).
-func (psc *pinnedSkylinksCache) Diff(sls []string) (unknown []string, missing []string) {
+func (psc *PinnedSkylinksCache) Diff(sls []string) (unknown []string, missing []string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 
-	removedMap := make(map[string]interface{})
+	removedMap := make(map[string]struct{})
 	for sl := range psc.skylinks {
 		removedMap[sl] = struct{}{}
 	}
@@ -87,23 +84,23 @@ func (psc *pinnedSkylinksCache) Diff(sls []string) (unknown []string, missing []
 }
 
 // Remove registers the given skylink in the cache.
-func (psc *pinnedSkylinksCache) Remove(skylink string) {
+func (psc *PinnedSkylinksCache) Remove(skylink string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 	if psc.skylinks == nil {
-		psc.skylinks = make(map[string]interface{})
+		psc.skylinks = make(map[string]struct{})
 	}
 	delete(psc.skylinks, skylink)
 }
 
 // blockingWaitForRebuild blocks until the current cache rebuild process ends.
-func (psc *pinnedSkylinksCache) blockingWaitForRebuild() {
+func (psc *PinnedSkylinksCache) blockingWaitForRebuild() {
 	<-psc.rebuildCh
 	return
 }
 
 // managedIsRebuildInProgress returns true if a cache rebuild is in progress.
-func (psc *pinnedSkylinksCache) managedIsRebuildInProgress() bool {
+func (psc *PinnedSkylinksCache) managedIsRebuildInProgress() bool {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 	select {
@@ -115,14 +112,14 @@ func (psc *pinnedSkylinksCache) managedIsRebuildInProgress() bool {
 }
 
 // managedReplaceCache replaces the entire cache content.
-func (psc *pinnedSkylinksCache) managedReplaceCache(newCache map[string]interface{}) {
+func (psc *PinnedSkylinksCache) managedReplaceCache(newCache map[string]struct{}) {
 	psc.mu.Lock()
 	psc.skylinks = newCache
 	psc.mu.Unlock()
 }
 
 // managedSignalRebuildEnd marks the end of a cache rebuild.
-func (psc *pinnedSkylinksCache) managedSignalRebuildEnd() error {
+func (psc *PinnedSkylinksCache) managedSignalRebuildEnd() error {
 	if !psc.managedIsRebuildInProgress() {
 		return ErrNoRebuildInProgress
 	}
@@ -133,7 +130,7 @@ func (psc *pinnedSkylinksCache) managedSignalRebuildEnd() error {
 }
 
 // managedSignalRebuildStart marks the start of a cache rebuild.
-func (psc *pinnedSkylinksCache) managedSignalRebuildStart() error {
+func (psc *PinnedSkylinksCache) managedSignalRebuildStart() error {
 	if psc.managedIsRebuildInProgress() {
 		return ErrRebuildInProgress
 	}

@@ -9,7 +9,7 @@ import (
 type (
 	// SkydClientMock is a mock of skyd.Client
 	SkydClientMock struct {
-		pinnedSkylinks      map[string]interface{}
+		pinnedSkylinks      map[string]struct{}
 		pinError            error
 		unpinError          error
 		pinnedSkylinksError error
@@ -23,10 +23,15 @@ type (
 // NewSkydClientMock returns an initialised copy of SkydClientMock
 func NewSkydClientMock() *SkydClientMock {
 	return &SkydClientMock{
-		pinnedSkylinks: make(map[string]interface{}),
+		pinnedSkylinks: make(map[string]struct{}),
 		metadata:       make(map[string]skymodules.SkyfileMetadata),
 		metadataErrors: make(map[string]error),
 	}
+}
+
+// DiffPinnedSkylinks is a mock.
+func (c *SkydClientMock) DiffPinnedSkylinks(_ []string) (unknown []string, missing []string) {
+	return nil, nil
 }
 
 // FileHealth returns the health of the given skylink.
@@ -64,7 +69,7 @@ func (c *SkydClientMock) Pin(skylink string) (skymodules.SiaPath, error) {
 }
 
 // PinnedSkylinks is a mock.
-func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]interface{}, err error) {
+func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]struct{}, err error) {
 	if c.pinnedSkylinksError == nil {
 		return c.pinnedSkylinks, nil
 	}

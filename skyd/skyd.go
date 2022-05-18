@@ -46,12 +46,12 @@ type (
 	client struct {
 		staticClient        *skydclient.Client
 		staticLogger        *logrus.Logger
-		staticSkylinksCache *pinnedSkylinksCache
+		staticSkylinksCache *PinnedSkylinksCache
 	}
 )
 
 // NewClient creates a new skyd client.
-func NewClient(host, port, password string, logger *logrus.Logger) Client {
+func NewClient(host, port, password string, cache *PinnedSkylinksCache, logger *logrus.Logger) Client {
 	opts := skydclient.Options{
 		Address:       fmt.Sprintf("%s:%s", host, port),
 		Password:      password,
@@ -61,7 +61,7 @@ func NewClient(host, port, password string, logger *logrus.Logger) Client {
 	return &client{
 		staticClient:        skydclient.New(opts),
 		staticLogger:        logger,
-		staticSkylinksCache: skylinksCache,
+		staticSkylinksCache: cache,
 	}
 }
 
@@ -130,7 +130,7 @@ func (c *client) RebuildCache() error {
 	}
 
 	// Rebuild the cache.
-	sls := make(map[string]interface{})
+	sls := make(map[string]struct{})
 	dirsToWalk := []skymodules.SiaPath{skymodules.SkynetFolder}
 	for len(dirsToWalk) > 0 {
 		// Pop the first dir and walk it.
