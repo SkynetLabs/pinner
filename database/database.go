@@ -14,6 +14,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
+const (
+	// MongoDefaultTimeout is our default timeout for database operations.
+	MongoDefaultTimeout = 30 * time.Second
+)
+
 var (
 	// ErrCtxFailedToConnect is the context we add to an error when we fail to
 	// connect to the db.

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
@@ -21,6 +23,17 @@ type (
 		staticLogger     *logrus.Logger
 		staticRouter     *httprouter.Router
 		staticSkydClient skyd.Client
+
+		latestSweepStatus   sweepStatus
+		latestSweepStatusMu sync.Mutex
+	}
+
+	// sweepStatus represents the status of a sweep.
+	sweepStatus struct {
+		InProgress bool
+		Error      error
+		StartTime  time.Time
+		EndTime    time.Time
 	}
 
 	// errorWrap is a helper type for converting an `error` struct to JSON.
@@ -81,6 +94,24 @@ func (api *API) WriteError(w http.ResponseWriter, err error, code int) {
 func (api *API) WriteJSON(w http.ResponseWriter, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
+	api.staticLogger.Traceln(http.StatusOK)
+	err := json.NewEncoder(w).Encode(obj)
+	if err != nil {
+		api.staticLogger.Debugln(err)
+	}
+	if _, isJSONErr := err.(*json.SyntaxError); isJSONErr {
+		// Marshalling should only fail in the event of a developer error.
+		// Specifically, only non-marshallable types should cause an error here.
+		build.Critical("failed to encode API response:", err)
+	}
+}
+
+// WriteJSONCustomStatus writes the object to the ResponseWriter. If the
+// encoding fails, an error is written instead. The Content-Type of the response
+// header is set accordingly.
+func (api *API) WriteJSONCustomStatus(w http.ResponseWriter, obj interface{}, status int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
 	api.staticLogger.Traceln(http.StatusOK)
 	err := json.NewEncoder(w).Encode(obj)
 	if err != nil {
