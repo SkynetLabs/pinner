@@ -136,15 +136,15 @@ func (s *Scanner) threadedScanAndPin() {
 
 	// Main execution loop, goes on forever while the service is running.
 	for {
-		// Check for service shutdown before talking to the DB.
+		// Rebuild the cache and watch for service shutdown while doing that.
+		res := s.staticSkydClient.RebuildCache()
 		select {
 		case <-s.staticTG.StopChan():
 			return
-		default:
-		}
-		err := s.staticSkydClient.RebuildCache()
-		if err != nil {
-			s.staticLogger.Warn(errors.AddContext(err, "failed to rebuild skyd client cache"))
+		case <-res.Ch:
+			if res.ExternErr != nil {
+				s.staticLogger.Warn(errors.AddContext(res.ExternErr, "failed to rebuild skyd client cache"))
+			}
 		}
 		s.refreshMinPinners()
 		s.pinUnderpinnedSkylinks()

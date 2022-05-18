@@ -173,7 +173,9 @@ func (api *API) threadedPerformSweep() {
 	var cacheErr error
 	go func() {
 		defer wg.Done()
-		cacheErr = api.staticSkydClient.RebuildCache()
+		res := api.staticSkydClient.RebuildCache()
+		<-res.Ch
+		cacheErr = res.ExternErr
 	}()
 
 	// We use an independent context because we are not strictly bound to a

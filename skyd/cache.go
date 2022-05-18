@@ -4,15 +4,9 @@ import (
 	"sync"
 
 	"gitlab.com/NebulousLabs/errors"
-)
-
-var (
-	// ErrNoRebuildInProgress is returned when we try to finish a rebuild but
-	// none is in progress.
-	ErrNoRebuildInProgress = errors.New("no rebuild in progress")
-	// ErrRebuildInProgress is returned when we try to start a rebuild and one
-	// is already in progress.
-	ErrRebuildInProgress = errors.New("rebuild in progress")
+	"gitlab.com/SkynetLabs/skyd/node/api"
+	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
+	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -20,31 +14,38 @@ type (
 	// information, so we don't need to fetch that for each skylink we
 	// potentially want to pin/unpin.
 	PinnedSkylinksCache struct {
-		rebuildCh chan interface{}
-		skylinks  map[string]struct{}
-		mu        sync.Mutex
+		result   *RebuildCacheResult
+		skylinks map[string]struct{}
+		mu       sync.Mutex
+	}
+	// RebuildCacheResult informs the caller on the status of a cache rebuild.
+	// The error should not be read before the channel is closed.
+	RebuildCacheResult struct {
+		// Ch indicates the status of the cache rebuild progress - if it's not
+		// closed then the rebuild is still in progress.
+		Ch chan struct{}
+		// ExternErr holds the error state of the cache rebuild process. It must
+		// only be read after Ch is closed.
+		ExternErr error
 	}
 )
 
 // NewCache returns a new cache instance.
 func NewCache() *PinnedSkylinksCache {
-	closedCh := make(chan interface{})
-	close(closedCh)
 	return &PinnedSkylinksCache{
-		rebuildCh: closedCh,
-		skylinks:  nil,
-		mu:        sync.Mutex{},
+		result:   nil,
+		skylinks: make(map[string]struct{}),
+		mu:       sync.Mutex{},
 	}
 }
 
-// Add registers the given skylink in the cache.
-func (psc *PinnedSkylinksCache) Add(skylink string) {
+// Add registers the given skylinks in the cache.
+func (psc *PinnedSkylinksCache) Add(skylinks ...string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
-	if psc.skylinks == nil {
-		psc.skylinks = make(map[string]struct{})
+	for _, s := range skylinks {
+		psc.skylinks[s] = struct{}{}
 	}
-	psc.skylinks[skylink] = struct{}{}
 }
 
 // Contains returns true when the given skylink is in the cache.
@@ -61,8 +62,7 @@ func (psc *PinnedSkylinksCache) Contains(skylink string) bool {
 func (psc *PinnedSkylinksCache) Diff(sls []string) (unknown []string, missing []string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
-
-	removedMap := make(map[string]struct{})
+	removedMap := make(map[string]struct{}, len(psc.skylinks))
 	for sl := range psc.skylinks {
 		removedMap[sl] = struct{}{}
 	}
@@ -83,59 +83,82 @@ func (psc *PinnedSkylinksCache) Diff(sls []string) (unknown []string, missing []
 	return
 }
 
-// Remove registers the given skylink in the cache.
-func (psc *PinnedSkylinksCache) Remove(skylink string) {
+// Rebuild rebuilds the cache of skylinks pinned by the local skyd. The
+// rebuilding happens in a goroutine, allowing the method to return a channel
+// on which the caller can either wait or select. The caller can check whether
+// the rebuild was successful by calling Error().
+func (psc *PinnedSkylinksCache) Rebuild(skydClient *skydclient.Client) RebuildCacheResult {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
-	if psc.skylinks == nil {
-		psc.skylinks = make(map[string]struct{})
+	if !psc.isRebuildInProgress() {
+		psc.result = &RebuildCacheResult{
+			Ch:        make(chan struct{}),
+			ExternErr: nil,
+		}
+		// Kick off the actual rebuild in a separate goroutine.
+		go psc.threadedRebuild(skydClient)
 	}
-	delete(psc.skylinks, skylink)
+	return *psc.result
 }
 
-// blockingWaitForRebuild blocks until the current cache rebuild process ends.
-func (psc *PinnedSkylinksCache) blockingWaitForRebuild() {
-	<-psc.rebuildCh
-	return
-}
-
-// managedIsRebuildInProgress returns true if a cache rebuild is in progress.
-func (psc *PinnedSkylinksCache) managedIsRebuildInProgress() bool {
+// Remove registers the given skylinks in the cache.
+func (psc *PinnedSkylinksCache) Remove(skylinks ...string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
-	select {
-	case <-psc.rebuildCh:
-		return false
-	default:
-		return true
+	for _, s := range skylinks {
+		delete(psc.skylinks, s)
 	}
 }
 
-// managedReplaceCache replaces the entire cache content.
-func (psc *PinnedSkylinksCache) managedReplaceCache(newCache map[string]struct{}) {
-	psc.mu.Lock()
-	psc.skylinks = newCache
-	psc.mu.Unlock()
+// isRebuildInProgress returns true if a cache rebuild is in progress.
+// Calling this method assumes that caller is holding a lock on the cache.
+func (psc *PinnedSkylinksCache) isRebuildInProgress() bool {
+	return psc.result != nil
 }
 
-// managedSignalRebuildEnd marks the end of a cache rebuild.
-func (psc *PinnedSkylinksCache) managedSignalRebuildEnd() error {
-	if !psc.managedIsRebuildInProgress() {
-		return ErrNoRebuildInProgress
-	}
-	psc.mu.Lock()
-	close(psc.rebuildCh)
-	psc.mu.Unlock()
-	return nil
-}
+// threadedRebuild performs the actual cache rebuild process. It reports any
+// errors by setting the psc.err variable and it always closes the rebuildCh on
+// exit.
+func (psc *PinnedSkylinksCache) threadedRebuild(skydClient *skydclient.Client) {
+	var err error
+	// Ensure that we properly wrap up the rebuild process.
+	defer func() {
+		psc.mu.Lock()
+		// Update the result.
+		psc.result.ExternErr = err
+		close(psc.result.Ch)
+		// Mark the rebuild as done.
+		psc.result = nil
+		psc.mu.Unlock()
+	}()
 
-// managedSignalRebuildStart marks the start of a cache rebuild.
-func (psc *PinnedSkylinksCache) managedSignalRebuildStart() error {
-	if psc.managedIsRebuildInProgress() {
-		return ErrRebuildInProgress
+	// Walk the entire Skynet folder and scan all files we find for skylinks.
+	dirsToWalk := []skymodules.SiaPath{skymodules.SkynetFolder}
+	sls := make(map[string]struct{})
+	var rd api.RenterDirectory
+	for len(dirsToWalk) > 0 {
+		// Pop the first dir and walk it.
+		dir := dirsToWalk[0]
+		dirsToWalk = dirsToWalk[1:]
+		rd, err = skydClient.RenterDirRootGet(dir)
+		if err != nil {
+			err = errors.AddContext(err, "failed to fetch skynet directories from skyd")
+			return
+		}
+		for _, f := range rd.Files {
+			for _, sl := range f.Skylinks {
+				sls[sl] = struct{}{}
+			}
+		}
+		// Grab all subdirs and queue them for walking.
+		// Skip the first element because that's current directory.
+		for i := 1; i < len(rd.Directories); i++ {
+			dirsToWalk = append(dirsToWalk, rd.Directories[i].SiaPath)
+		}
 	}
+
+	// Update the cache.
 	psc.mu.Lock()
-	psc.rebuildCh = make(chan interface{})
+	psc.skylinks = sls
 	psc.mu.Unlock()
-	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/SkynetLabs/skyd/build"
 	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 	"gitlab.com/SkynetLabs/skyd/skymodules/renter"
@@ -34,7 +33,7 @@ type (
 		// Pin instructs the local skyd to pin the given skylink.
 		Pin(skylink string) (skymodules.SiaPath, error)
 		// RebuildCache rebuilds the cache of skylinks pinned by the local skyd.
-		RebuildCache() error
+		RebuildCache() RebuildCacheResult
 		// Resolve resolves a V2 skylink to a V1 skylink. Returns an error if
 		// the given skylink is not V2.
 		Resolve(skylink string) (string, error)
@@ -118,53 +117,9 @@ func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 	return sp, err
 }
 
-// RebuildCache rebuilds the cache of skylinks pinned by the local skyd.
-func (c *client) RebuildCache() error {
-	// Signal  cache rebuild start.
-	err := c.staticSkylinksCache.managedSignalRebuildStart()
-	if errors.Contains(err, ErrRebuildInProgress) {
-		// A rebuild is already in progress. All we need to do is wait for it to
-		// finish and return a success.
-		c.staticSkylinksCache.blockingWaitForRebuild()
-		return nil
-	}
-
-	// Rebuild the cache.
-	sls := make(map[string]struct{})
-	dirsToWalk := []skymodules.SiaPath{skymodules.SkynetFolder}
-	for len(dirsToWalk) > 0 {
-		// Pop the first dir and walk it.
-		dir := dirsToWalk[0]
-		dirsToWalk = dirsToWalk[1:]
-		rd, err := c.staticClient.RenterDirRootGet(dir)
-		if err != nil {
-			return errors.AddContext(err, "failed to fetch skynet directories from skyd")
-		}
-		for _, f := range rd.Files {
-			for _, sl := range f.Skylinks {
-				sls[sl] = struct{}{}
-			}
-		}
-		// Grab all subdirs and queue them for walking.
-		// Skip the first element because that's current directory.
-		for i := 1; i < len(rd.Directories); i++ {
-			dirsToWalk = append(dirsToWalk, rd.Directories[i].SiaPath)
-		}
-	}
-
-	// Update the cache.
-	c.staticSkylinksCache.managedReplaceCache(sls)
-
-	// Signal a cache rebuild end.
-	err = c.staticSkylinksCache.managedSignalRebuildEnd()
-	if err != nil {
-		// This should never happen, so we log a build.Critical. We don't need
-		// to return an error to the caller, though, because the cache was
-		// rebuilt and from their perspective everything is fine.
-		build.Critical(errors.AddContext(err, "we started a rebuild but somebody else finished it for us"))
-	}
-
-	return nil
+// RebuildCache
+func (c *client) RebuildCache() RebuildCacheResult {
+	return c.staticSkylinksCache.Rebuild(c.staticClient)
 }
 
 // Resolve resolves a V2 skylink to a V1 skylink. Returns an error if the given

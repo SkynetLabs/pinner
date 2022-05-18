@@ -3,6 +3,7 @@ package mocks
 import (
 	"sync"
 
+	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
@@ -77,8 +78,13 @@ func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]struct{}, err err
 }
 
 // RebuildCache is a noop mock.
-func (c *SkydClientMock) RebuildCache() error {
-	return nil
+func (c *SkydClientMock) RebuildCache() skyd.RebuildCacheResult {
+	closedCh := make(chan struct{})
+	close(closedCh)
+	return skyd.RebuildCacheResult{
+		Ch:        closedCh,
+		ExternErr: nil,
+	}
 }
 
 // Resolve is a noop mock.
