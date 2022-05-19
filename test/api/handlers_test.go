@@ -2,9 +2,11 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/test"
 	"gitlab.com/NebulousLabs/errors"
@@ -59,6 +61,23 @@ func testHandlerHealthGET(t *testing.T, tt *test.Tester) {
 	// wouldn't have made it this far in the test.
 	if !status.DBAlive {
 		t.Fatal("DB down.")
+	}
+	if status.MinPinners != 1 {
+		t.Fatalf("Expected min_pinners to have its default value of 1, got %d", status.MinPinners)
+	}
+	// Set a new min_pinners value.
+	newMinPinners := 2
+	err = tt.DB.SetConfigValue(tt.Ctx, conf.ConfMinPinners, strconv.Itoa(newMinPinners))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Verify the new value.
+	status, _, err = tt.HealthGET()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.MinPinners != newMinPinners {
+		t.Fatalf("Expected %d, got %d", newMinPinners, status.MinPinners)
 	}
 }
 
