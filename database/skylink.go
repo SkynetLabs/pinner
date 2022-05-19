@@ -50,23 +50,6 @@ type (
 	}
 )
 
-// ConfigValue returns a cluster-wide configuration value, stored in the
-// database.
-func (db *DB) ConfigValue(ctx context.Context, key string) (string, error) {
-	sr := db.staticDB.Collection(collConfig).FindOne(ctx, bson.M{"key": key})
-	if sr.Err() != nil {
-		return "", sr.Err()
-	}
-	var result = struct {
-		Value string
-	}{}
-	err := sr.Decode(&result)
-	if err != nil {
-		return "", err
-	}
-	return result.Value, nil
-}
-
 // CreateSkylink inserts a new skylink into the DB. Returns an error if it
 // already exists.
 func (db *DB) CreateSkylink(ctx context.Context, skylink skymodules.Skylink, server string) (Skylink, error) {

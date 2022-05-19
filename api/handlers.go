@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
@@ -17,7 +18,8 @@ import (
 type (
 	// HealthGET is the response type of GET /health
 	HealthGET struct {
-		DBAlive bool `json:"dbAlive"`
+		DBAlive    bool `json:"dbAlive"`
+		MinPinners int  `json:"minPinners"`
 	}
 	// SkylinkRequest describes a request that only provides a skylink.
 	SkylinkRequest struct {
@@ -31,9 +33,10 @@ type (
 
 // healthGET returns the status of the service
 func (api *API) healthGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	mp, err := conf.MinPinners(req.Context(), api.staticDB)
 	var status HealthGET
-	err := api.staticDB.Ping(req.Context())
 	status.DBAlive = err == nil
+	status.MinPinners = mp
 	api.WriteJSON(w, status)
 }
 

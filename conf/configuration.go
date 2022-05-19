@@ -27,7 +27,9 @@ const (
 // Cluster-wide configuration variable names.
 // Stored in the database.
 const (
-	confMinPinners = "min_pinners"
+	// ConfMinPinners holds the name of the configuration setting which defines
+	// the minimum number of pinners we want to ensure for each skyfile.
+	ConfMinPinners = "min_pinners"
 )
 
 const (
@@ -136,7 +138,7 @@ func LoadConfig() (Config, error) {
 // MinPinners returns the cluster-wide value of the minimum number of servers we
 // expect to be pinning each skylink.
 func MinPinners(ctx context.Context, db *database.DB) (int, error) {
-	val, err := db.ConfigValue(ctx, confMinPinners)
+	val, err := db.ConfigValue(ctx, ConfMinPinners)
 	if errors.Contains(err, mongo.ErrNoDocuments) {
 		return defaultMinPinners, nil
 	}

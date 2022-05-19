@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"gitlab.com/NebulousLabs/errors"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -94,6 +95,23 @@ func NewCustomDB(ctx context.Context, dbName string, creds DBCredentials, logger
 	}, nil
 }
 
+// ConfigValue returns a cluster-wide configuration value, stored in the
+// database.
+func (db *DB) ConfigValue(ctx context.Context, key string) (string, error) {
+	sr := db.staticDB.Collection(collConfig).FindOne(ctx, bson.M{"key": key})
+	if sr.Err() != nil {
+		return "", sr.Err()
+	}
+	var result = struct {
+		Value string
+	}{}
+	err := sr.Decode(&result)
+	if err != nil {
+		return "", err
+	}
+	return result.Value, nil
+}
+
 // Disconnect closes the connection to the database in an orderly fashion.
 func (db *DB) Disconnect(ctx context.Context) error {
 	return db.staticDB.Client().Disconnect(ctx)
@@ -105,6 +123,21 @@ func (db *DB) Ping(ctx context.Context) error {
 	ctx2, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return db.staticDB.Client().Ping(ctx2, readpref.Primary())
+}
+
+// SetConfigValue updates a cluster-wide configuration value, stored in the
+// database.
+func (db *DB) SetConfigValue(ctx context.Context, key, value string) error {
+	opts := options.Update().SetUpsert(true)
+	filter := bson.M{"key": key}
+	update := bson.M{
+		"$set": bson.M{
+			"key":   key,
+			"value": value,
+		},
+	}
+	_, err := db.staticDB.Collection(collConfig).UpdateOne(ctx, filter, update, opts)
+	return err
 }
 
 // ensureDBSchema checks that we have all collections and indexes we need and
