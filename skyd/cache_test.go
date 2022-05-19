@@ -43,7 +43,7 @@ func (scm *NodeSkydClientMock) SetMapping(siaPath skymodules.SiaPath, rdrt rdRet
 	scm.presets[siaPath] = rdrt
 }
 
-// TestCacheBase covers the base functionality of PinnerSkylinksCache:
+// TestCacheBase covers the base functionality of PinnedSkylinksCache:
 // * NewCache
 // * Add
 // * Contains
@@ -83,7 +83,7 @@ func TestCacheBase(t *testing.T) {
 	}
 }
 
-// TestCacheRebuild covers the Rebuild functionality of PinnerSkylinksCache.
+// TestCacheRebuild covers the Rebuild functionality of PinnedSkylinksCache.
 func TestCacheRebuild(t *testing.T) {
 	t.Parallel()
 
