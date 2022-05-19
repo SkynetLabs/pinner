@@ -94,8 +94,8 @@ func testHandlerPinPOST(t *testing.T, tt *test.Tester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if slNew.Unpin {
-		t.Fatal("Expected the skylink to no longer be marked as unpinned.")
+	if !slNew.Pinned {
+		t.Fatal("Expected the skylink to be pinned.")
 	}
 }
 
@@ -123,7 +123,7 @@ func testHandlerUnpinPOST(t *testing.T, tt *test.Tester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slNew.Unpin {
+	if slNew.Pinned {
 		t.Fatal("Expected the skylink to be marked as unpinned.")
 	}
 	// Unpin a valid skylink that's not in the DB, yet.
@@ -137,7 +137,7 @@ func testHandlerUnpinPOST(t *testing.T, tt *test.Tester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sl2New.Unpin {
+	if sl2New.Pinned {
 		t.Fatal("Expected the skylink to be marked as unpinned.")
 	}
 }

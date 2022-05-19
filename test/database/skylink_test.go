@@ -100,7 +100,7 @@ func TestSkylink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.Unpin {
+	if s.Pinned {
 		t.Fatal("Expected the skylink to be unpinned.")
 	}
 	// Mark the file as pinned again.
@@ -112,7 +112,7 @@ func TestSkylink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Unpin {
+	if !s.Pinned {
 		t.Fatal("Expected the skylink to be pinned.")
 	}
 	// Mark the skylink as unpinned again.
@@ -130,7 +130,7 @@ func TestSkylink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.Unpin {
+	if s.Pinned {
 		t.Fatal("Expected the skylink to be unpinned.")
 	}
 	// Add a server to the skylink with `markUnpinned` set to true.
@@ -143,7 +143,7 @@ func TestSkylink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Unpin {
+	if !s.Pinned {
 		t.Fatal("Expected the skylink to be pinned.")
 	}
 }
