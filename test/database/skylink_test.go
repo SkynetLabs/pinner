@@ -9,8 +9,16 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
-// TestSkylink is a comprehensive test suite that covers the entire
-// functionality of the Skylink database type.
+// TestSkylink is a comprehensive test suite that covers the base functionality
+// of the Skylink database type.
+//
+// Tested methods:
+// * CreateSkylink
+// * FindSkylink
+// * MarkPinned
+// * MarkUnpinned
+// * AddServerForSkylink
+// * RemoveServerFromSkylink
 func TestSkylink(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -140,7 +148,8 @@ func TestSkylink(t *testing.T) {
 	}
 }
 
-// TestFindAndLock tests the functionality of FindAndLockUnderpinned.
+// TestFindAndLock tests the functionality of FindAndLockUnderpinned and
+// UnlockSkylink.
 func TestFindAndLock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -323,8 +332,8 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 	}
 }
 
-// TestSkylinksPerServer ensures that SkylinksForServer works as expected.
-func TestSkylinksPerServer(t *testing.T) {
+// TestSkylinksForServer ensures that SkylinksForServer works as expected.
+func TestSkylinksForServer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -360,7 +369,7 @@ func TestSkylinksPerServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(ls, sl1.String()) {
+	if !test.Contains(ls, sl1.String()) {
 		t.Fatalf("Expected a list containing only %s but got %+v", sl1.String(), ls)
 	}
 	// Add another skylink.
@@ -373,7 +382,7 @@ func TestSkylinksPerServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(ls, sl1.String()) || !contains(ls, sl2.String()) {
+	if !test.Contains(ls, sl1.String()) || !test.Contains(ls, sl2.String()) {
 		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
 	}
 	// Add a second server to sl1 and expect it to still show up on the list.
@@ -385,7 +394,7 @@ func TestSkylinksPerServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(ls, sl1.String()) {
+	if !test.Contains(ls, sl1.String()) {
 		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
 	}
 	// Remove srv1 as pinner for both sl1 and sl2.
@@ -410,17 +419,7 @@ func TestSkylinksPerServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(ls, sl1.String()) {
+	if !test.Contains(ls, sl1.String()) {
 		t.Fatalf("Expected a list containing only %s but got %+v", sl1.String(), ls)
 	}
-}
-
-// contains checks whether a slice of strings contains a given string.
-func contains(ss []string, s string) bool {
-	for _, str := range ss {
-		if str == s {
-			return true
-		}
-	}
-	return false
 }

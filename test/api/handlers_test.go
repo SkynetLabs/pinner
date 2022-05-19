@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -143,6 +144,24 @@ func testHandlerUnpinPOST(t *testing.T, tt *test.Tester) {
 
 // testHandlerSweep tests both "POST /sweep" and "GET /sweep/status"
 func testHandlerSweep(t *testing.T, tt *test.Tester) {
+	// Prepare for the test by setting the state of skyd's mock.
+	//
+	// We'll have 3 skylinks:
+	// 1 and 2 are pinned by skyd
+	// 2 and 3 are marked in the database as pinned by skyd
+	// What we expect after the sweep is to have 1 and 2 marked as pinned in the
+	// database and 3 - not.
+	sl1 := test.RandomSkylink()
+	sl2 := test.RandomSkylink()
+	sl3 := test.RandomSkylink()
+	_, e1 := tt.SkydClient.Pin(sl1.String())
+	_, e2 := tt.SkydClient.Pin(sl2.String())
+	_, e3 := tt.PinPOST(sl2.String())
+	_, e4 := tt.PinPOST(sl3.String())
+	if e := errors.Compose(e1, e2, e3, e4); e != nil {
+		t.Fatal(e)
+	}
+
 	// Check status. Expect zero value, no error.
 	sweepStatus, code, err := tt.SweepStatusGET()
 	if err != nil || code != http.StatusOK {
@@ -179,7 +198,6 @@ func testHandlerSweep(t *testing.T, tt *test.Tester) {
 	if err != nil || code != http.StatusAccepted {
 		t.Fatalf("Unexpected status code or error: %d %+v", code, err)
 	}
-
 	// Check status. Expect the sweep start time to be the same as before, i.e.
 	// no new sweep has been kicked off.
 	initialSweepStartTime := sweepStatus.StartTime
@@ -192,5 +210,31 @@ func testHandlerSweep(t *testing.T, tt *test.Tester) {
 	}
 	if !sweepStatus.StartTime.Equal(initialSweepStartTime) {
 		t.Fatalf("Expected the start time of the current scan to match the start time of the first scan we kicked off. Expected %v, got %v", initialSweepStartTime, sweepStatus.StartTime)
+	}
+	// Wait for the sweep to finish.
+	for sweepStatus.InProgress {
+		time.Sleep(100 * time.Millisecond)
+		sweepStatus, code, err = tt.SweepStatusGET()
+		if err != nil || code != http.StatusOK {
+			t.Fatalf("Unexpected status code or error: %d %+v", code, err)
+		}
+		if !sweepStatus.InProgress {
+			break
+		}
+	}
+	// Make sure we have the expected database state - skylinks 1 and 2 are
+	// pinned and 3 is not.
+	skylinks, err := tt.DB.SkylinksForServer(context.Background(), tt.ServerName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !test.Contains(skylinks, sl1.String()) {
+		t.Fatalf("Expected %v to contain %s", skylinks, sl1.String())
+	}
+	if !test.Contains(skylinks, sl2.String()) {
+		t.Fatalf("Expected %v to contain %s", skylinks, sl2.String())
+	}
+	if test.Contains(skylinks, sl3.String()) {
+		t.Fatalf("Expected %v NOT to contain %s", skylinks, sl3.String())
 	}
 }

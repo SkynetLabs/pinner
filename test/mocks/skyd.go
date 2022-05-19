@@ -11,12 +11,11 @@ import (
 type (
 	// SkydClientMock is a mock of skyd.Client
 	SkydClientMock struct {
-		skylinks            map[string]struct{}
-		pinError            error
-		unpinError          error
-		pinnedSkylinksError error
-		metadata            map[string]skymodules.SkyfileMetadata
-		metadataErrors      map[string]error
+		skylinks       map[string]struct{}
+		pinError       error
+		unpinError     error
+		metadata       map[string]skymodules.SkyfileMetadata
+		metadataErrors map[string]error
 
 		mu sync.Mutex
 	}
@@ -91,15 +90,7 @@ func (c *SkydClientMock) Pin(skylink string) (skymodules.SiaPath, error) {
 	return sp, c.pinError
 }
 
-// PinnedSkylinks is a mock.
-func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]struct{}, err error) {
-	if c.pinnedSkylinksError == nil {
-		return c.skylinks, nil
-	}
-	return nil, c.pinnedSkylinksError
-}
-
-// RebuildCache is a noop mock.
+// RebuildCache is a noop mock that takes at least 100ms.
 func (c *SkydClientMock) RebuildCache() skyd.RebuildCacheResult {
 	closedCh := make(chan struct{})
 	close(closedCh)
@@ -138,11 +129,6 @@ func (c *SkydClientMock) SetMetadata(skylink string, meta skymodules.SkyfileMeta
 // SetPinError sets the pin error
 func (c *SkydClientMock) SetPinError(e error) {
 	c.pinError = e
-}
-
-// SetPinnedSkylinksError sets the skylinks error
-func (c *SkydClientMock) SetPinnedSkylinksError(e error) {
-	c.pinnedSkylinksError = e
 }
 
 // SetUnpinError sets the unpin error
