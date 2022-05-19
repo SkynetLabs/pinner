@@ -5,7 +5,6 @@ import (
 
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/node/api"
-	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
@@ -27,6 +26,12 @@ type (
 		// ExternErr holds the error state of the cache rebuild process. It must
 		// only be read after Ch is closed.
 		ExternErr error
+	}
+	// OwnSkydClient describes the part of skydclient.Client which we need. This
+	// type exists for testing purposes.
+	// TODO better name.
+	OwnSkydClient interface {
+		RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.RenterDirectory, err error)
 	}
 )
 
@@ -87,7 +92,7 @@ func (psc *PinnedSkylinksCache) Diff(sls []string) (unknown []string, missing []
 // rebuilding happens in a goroutine, allowing the method to return a channel
 // on which the caller can either wait or select. The caller can check whether
 // the rebuild was successful by calling Error().
-func (psc *PinnedSkylinksCache) Rebuild(skydClient *skydclient.Client) RebuildCacheResult {
+func (psc *PinnedSkylinksCache) Rebuild(skydClient OwnSkydClient) RebuildCacheResult {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 	if !psc.isRebuildInProgress() {
@@ -119,7 +124,7 @@ func (psc *PinnedSkylinksCache) isRebuildInProgress() bool {
 // threadedRebuild performs the actual cache rebuild process. It reports any
 // errors by setting the psc.err variable and it always closes the rebuildCh on
 // exit.
-func (psc *PinnedSkylinksCache) threadedRebuild(skydClient *skydclient.Client) {
+func (psc *PinnedSkylinksCache) threadedRebuild(skydClient OwnSkydClient) {
 	var err error
 	// Ensure that we properly wrap up the rebuild process.
 	defer func() {
