@@ -23,6 +23,10 @@ type (
 	SkylinkRequest struct {
 		Skylink string
 	}
+	// SweepPOSTResponse is the response to POST /sweep
+	SweepPOSTResponse struct {
+		Href string
+	}
 )
 
 // healthGET returns the status of the service
@@ -104,9 +108,12 @@ func (api *API) sweepPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.P
 		go api.threadedPerformSweep()
 	}
 	api.latestSweepStatusMu.Unlock()
-
-	response := struct{ Href string }{"/sweep/status"}
-	api.WriteJSONCustomStatus(w, response, http.StatusAccepted)
+	// TODO If we want to be able to uniquely identify sweeps we can issue ids
+	//  for them and keep their statuses in a map. This would be the appropriate
+	//  RESTful approach. I am not sure we need that because all we care about
+	//  is to be able to kick off one and wait for it to end and this
+	//  implementations is sufficient for that.
+	api.WriteJSONCustomStatus(w, SweepPOSTResponse{"/sweep/status"}, http.StatusAccepted)
 }
 
 // sweepStatusGET responds with the status of the latest sweep.
@@ -149,7 +156,7 @@ func (api *API) threadedPerformSweep() {
 		return
 	}
 	// Initialise the status to "a sweep is running".
-	api.latestSweepStatus = sweepStatus{
+	api.latestSweepStatus = SweepStatus{
 		InProgress: true,
 		Error:      nil,
 		StartTime:  time.Now().UTC(),

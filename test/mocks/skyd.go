@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"sync"
+	"time"
 
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
@@ -10,7 +11,7 @@ import (
 type (
 	// SkydClientMock is a mock of skyd.Client
 	SkydClientMock struct {
-		pinnedSkylinks      map[string]struct{}
+		skylinks            map[string]struct{}
 		pinError            error
 		unpinError          error
 		pinnedSkylinksError error
@@ -24,15 +25,36 @@ type (
 // NewSkydClientMock returns an initialised copy of SkydClientMock
 func NewSkydClientMock() *SkydClientMock {
 	return &SkydClientMock{
-		pinnedSkylinks: make(map[string]struct{}),
+		skylinks:       make(map[string]struct{}),
 		metadata:       make(map[string]skymodules.SkyfileMetadata),
 		metadataErrors: make(map[string]error),
 	}
 }
 
-// DiffPinnedSkylinks is a mock.
-func (c *SkydClientMock) DiffPinnedSkylinks(_ []string) (unknown []string, missing []string) {
-	return nil, nil
+// DiffPinnedSkylinks is a carbon copy of PinnedSkylinksCache's version of the
+// method.
+func (c *SkydClientMock) DiffPinnedSkylinks(skylinks []string) (unknown []string, missing []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	removedMap := make(map[string]struct{}, len(c.skylinks))
+	for sl := range c.skylinks {
+		removedMap[sl] = struct{}{}
+	}
+	for _, sl := range skylinks {
+		// Remove this skylink from the removedMap, because it has not been
+		// removed.
+		delete(removedMap, sl)
+		// If it's not in the cache - add it to the added list.
+		_, exists := c.skylinks[sl]
+		if !exists {
+			unknown = append(unknown, sl)
+		}
+	}
+	// Transform the removed map into a list.
+	for sl := range removedMap {
+		missing = append(missing, sl)
+	}
+	return
 }
 
 // FileHealth returns the health of the given skylink.
@@ -42,7 +64,7 @@ func (c *SkydClientMock) FileHealth(_ skymodules.SiaPath) (float64, error) {
 
 // IsPinning checks whether skyd is pinning the given skylink.
 func (c *SkydClientMock) IsPinning(skylink string) bool {
-	_, exists := c.pinnedSkylinks[skylink]
+	_, exists := c.skylinks[skylink]
 	return exists
 }
 
@@ -61,7 +83,7 @@ func (c *SkydClientMock) Pin(skylink string) (skymodules.SiaPath, error) {
 	if c.pinError == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		c.pinnedSkylinks[skylink] = struct{}{}
+		c.skylinks[skylink] = struct{}{}
 	}
 	sp := skymodules.SiaPath{
 		Path: skylink,
@@ -72,7 +94,7 @@ func (c *SkydClientMock) Pin(skylink string) (skymodules.SiaPath, error) {
 // PinnedSkylinks is a mock.
 func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]struct{}, err error) {
 	if c.pinnedSkylinksError == nil {
-		return c.pinnedSkylinks, nil
+		return c.skylinks, nil
 	}
 	return nil, c.pinnedSkylinksError
 }
@@ -81,6 +103,8 @@ func (c *SkydClientMock) PinnedSkylinks() (skylinks map[string]struct{}, err err
 func (c *SkydClientMock) RebuildCache() skyd.RebuildCacheResult {
 	closedCh := make(chan struct{})
 	close(closedCh)
+	// Do some work. There are tests which rely on this value to be above 50ms.
+	time.Sleep(100 * time.Millisecond)
 	return skyd.RebuildCacheResult{
 		Ch:        closedCh,
 		ExternErr: nil,
@@ -99,7 +123,7 @@ func (c *SkydClientMock) Unpin(skylink string) error {
 	if c.unpinError == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		delete(c.pinnedSkylinks, skylink)
+		delete(c.skylinks, skylink)
 	}
 	return c.unpinError
 }
@@ -116,7 +140,7 @@ func (c *SkydClientMock) SetPinError(e error) {
 	c.pinError = e
 }
 
-// SetPinnedSkylinksError sets the pinnedSkylinks error
+// SetPinnedSkylinksError sets the skylinks error
 func (c *SkydClientMock) SetPinnedSkylinksError(e error) {
 	c.pinnedSkylinksError = e
 }

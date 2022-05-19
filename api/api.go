@@ -24,12 +24,12 @@ type (
 		staticRouter     *httprouter.Router
 		staticSkydClient skyd.Client
 
-		latestSweepStatus   sweepStatus
+		latestSweepStatus   SweepStatus
 		latestSweepStatusMu sync.Mutex
 	}
 
-	// sweepStatus represents the status of a sweep.
-	sweepStatus struct {
+	// SweepStatus represents the status of a sweep.
+	SweepStatus struct {
 		InProgress bool
 		Error      error
 		StartTime  time.Time
@@ -112,7 +112,7 @@ func (api *API) WriteJSON(w http.ResponseWriter, obj interface{}) {
 func (api *API) WriteJSONCustomStatus(w http.ResponseWriter, obj interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	api.staticLogger.Traceln(http.StatusOK)
+	api.staticLogger.Traceln(status)
 	err := json.NewEncoder(w).Encode(obj)
 	if err != nil {
 		api.staticLogger.Debugln(err)
