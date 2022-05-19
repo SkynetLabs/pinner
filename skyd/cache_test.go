@@ -9,28 +9,28 @@ import (
 )
 
 type (
-	// SkydClientMock implements OwnSkydClient.
-	SkydClientMock struct {
+	// NodeSkydClientMock implements NodeSkydClient.
+	NodeSkydClientMock struct {
 		presets map[skymodules.SiaPath]rdReturnType
 	}
 	// rdReturnType describes the return values of RenterDirRootGet and allows
-	// us to build a directory structure representation in SkydClientMock.
+	// us to build a directory structure representation in NodeSkydClientMock.
 	rdReturnType struct {
 		RD  api.RenterDirectory
 		Err error
 	}
 )
 
-// NewSkydClientMock returns a new mock of skydclient.Client which satisfies the
-// OwnSkydClient interface.
-func NewSkydClientMock() *SkydClientMock {
-	return &SkydClientMock{
+// NewSkydClientMock returns a new mock of skydclient.Client which satisfies
+// the NodeSkydClient interface.
+func NewSkydClientMock() *NodeSkydClientMock {
+	return &NodeSkydClientMock{
 		make(map[skymodules.SiaPath]rdReturnType),
 	}
 }
 
 // RenterDirRootGet is a functional mock.
-func (scm *SkydClientMock) RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.RenterDirectory, err error) {
+func (scm *NodeSkydClientMock) RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.RenterDirectory, err error) {
 	r, exists := scm.presets[siaPath]
 	if !exists {
 		return api.RenterDirectory{}, errors.New("siapath does not exist")
@@ -39,7 +39,7 @@ func (scm *SkydClientMock) RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.
 }
 
 // SetMapping allows us to set the internal state of the mock.
-func (scm *SkydClientMock) SetMapping(siaPath skymodules.SiaPath, rdrt rdReturnType) {
+func (scm *NodeSkydClientMock) SetMapping(siaPath skymodules.SiaPath, rdrt rdReturnType) {
 	scm.presets[siaPath] = rdrt
 }
 
@@ -111,7 +111,7 @@ func TestCacheRebuild(t *testing.T) {
 	}
 }
 
-// mock returns an initialised SkydClientMock and a list of all skylinks
+// mock returns an initialised NodeSkydClientMock and a list of all skylinks
 // contained in it.
 //
 // The mocked structure is the following:
@@ -126,7 +126,7 @@ func TestCacheRebuild(t *testing.T) {
 //       fileB (B__uSb3BpGxmSbRAg1xj5T8SdB4hiSFiEW2sEEzxt5MNkg)
 //    dirD/ (empty)
 //    file (___uSb3BpGxmSbRAg1xj5T8SdB4hiSFiEW2sEEzxt5MNkg)
-func mock() (*SkydClientMock, []string) {
+func mock() (*NodeSkydClientMock, []string) {
 	skyd := NewSkydClientMock()
 
 	slR0 := "___uSb3BpGxmSbRAg1xj5T8SdB4hiSFiEW2sEEzxt5MNkg"
