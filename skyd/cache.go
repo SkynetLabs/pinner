@@ -101,7 +101,7 @@ func (psc *PinnedSkylinksCache) Rebuild(skydClient Client) RebuildCacheResult {
 	return *psc.result
 }
 
-// Remove registers the given skylinks in the cache.
+// Remove removes the given skylinks in the cache.
 func (psc *PinnedSkylinksCache) Remove(skylinks ...string) {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
@@ -126,7 +126,7 @@ func (psc *PinnedSkylinksCache) threadedRebuild(skydClient Client) {
 		psc.mu.Lock()
 		// Update the result.
 		psc.result.ExternErr = err
-		close(psc.result.Ch)
+		psc.result.close()
 		// Mark the rebuild as done.
 		psc.result = nil
 		psc.mu.Unlock()
@@ -161,4 +161,15 @@ func (psc *PinnedSkylinksCache) threadedRebuild(skydClient Client) {
 	psc.mu.Lock()
 	psc.skylinks = sls
 	psc.mu.Unlock()
+}
+
+// close ensures that we don't try to close the results channel more than once.
+func (rr *RebuildCacheResult) close() {
+	select {
+	case <-rr.Ch:
+		build.Critical("double close on a results channel")
+		return
+	default:
+	}
+	close(rr.Ch)
 }

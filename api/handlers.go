@@ -216,7 +216,7 @@ func (api *API) threadedPerformSweep() {
 		if err != nil {
 			err = errors.AddContext(err, "invalid skylink found in DB")
 			build.Critical(err)
-			return
+			continue
 		}
 		err = api.staticDB.RemoveServerFromSkylink(ctx, s, api.staticServerName)
 		if err != nil {
@@ -230,7 +230,7 @@ func (api *API) threadedPerformSweep() {
 		if err != nil {
 			err = errors.AddContext(err, "invalid skylink reported by skyd")
 			build.Critical(err)
-			return
+			continue
 		}
 		err = api.staticDB.AddServerForSkylink(ctx, s, api.staticServerName, false)
 		if err != nil {
