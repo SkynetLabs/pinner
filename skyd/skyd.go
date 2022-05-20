@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/node/api"
 	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 	"gitlab.com/SkynetLabs/skyd/skymodules/renter"
@@ -34,6 +35,9 @@ type (
 		Pin(skylink string) (skymodules.SiaPath, error)
 		// RebuildCache rebuilds the cache of skylinks pinned by the local skyd.
 		RebuildCache() RebuildCacheResult
+		// RenterDirRootGet is a direct proxy to the skyd client method with the
+		// same name.
+		RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.RenterDirectory, err error)
 		// Resolve resolves a V2 skylink to a V1 skylink. Returns an error if
 		// the given skylink is not V2.
 		Resolve(skylink string) (string, error)
@@ -117,9 +121,17 @@ func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 	return sp, err
 }
 
-// RebuildCache
+// RebuildCache rebuilds the cache of skylinks pinned by the local skyd. The
+// rebuilding happens in a goroutine, allowing the method to return a channel
+// on which the caller can either wait or select. The caller can check whether
+// the rebuild was successful by calling Error().
 func (c *client) RebuildCache() RebuildCacheResult {
-	return c.staticSkylinksCache.Rebuild(c.staticClient)
+	return c.staticSkylinksCache.Rebuild(c)
+}
+
+// RenterDirRootGet is a direct proxy to skyd client's method.
+func (c *client) RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.RenterDirectory, err error) {
+	return c.staticClient.RenterDirRootGet(siaPath)
 }
 
 // Resolve resolves a V2 skylink to a V1 skylink. Returns an error if the given
