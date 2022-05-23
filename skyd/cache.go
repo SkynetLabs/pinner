@@ -21,9 +21,6 @@ type (
 	// RebuildCacheResult informs the caller on the status of a cache rebuild.
 	// The error should not be read before the channel is closed.
 	RebuildCacheResult struct {
-		// errAvail indicates the status of the cache rebuild progress.
-		// We expose this same channel as <-chan ErrAvail.
-		errAvail chan struct{}
 		// ErrAvail indicates the status of the cache rebuild progress -
 		// if it's not closed then the rebuild is still in progress. We expose
 		// it as a <-chan, so the receiver cannot close it.
@@ -31,6 +28,9 @@ type (
 		// ExternErr holds the error state of the cache rebuild process. It must
 		// only be read after ErrAvail is closed.
 		ExternErr error
+		// errAvail indicates the status of the cache rebuild progress.
+		// We expose this same channel as <-chan ErrAvail.
+		errAvail chan struct{}
 	}
 )
 
