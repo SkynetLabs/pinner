@@ -9,8 +9,16 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
-// TestSkylink is a comprehensive test suite that covers the entire
-// functionality of the Skylink database type.
+// TestSkylink is a comprehensive test suite that covers the base functionality
+// of the Skylink database type.
+//
+// Tested methods:
+// * CreateSkylink
+// * FindSkylink
+// * MarkPinned
+// * MarkUnpinned
+// * AddServerForSkylink
+// * RemoveServerFromSkylink
 func TestSkylink(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -140,7 +148,8 @@ func TestSkylink(t *testing.T) {
 	}
 }
 
-// TestFindAndLock tests the functionality of FindAndLockUnderpinned.
+// TestFindAndLock tests the functionality of FindAndLockUnderpinned and
+// UnlockSkylink.
 func TestFindAndLock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -320,5 +329,97 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 	newLocked, err = db.FindAndLockUnderpinned(ctx, cfg.ServerName, cfg.MinPinners)
 	if !errors.Contains(err, database.ErrNoUnderpinnedSkylinks) {
 		t.Fatalf("Expected '%v', got '%v'", database.ErrNoUnderpinnedSkylinks, err)
+	}
+}
+
+// TestSkylinksForServer ensures that SkylinksForServer works as expected.
+func TestSkylinksForServer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	ctx := context.Background()
+	db, err := test.NewDatabase(ctx, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sl1 := test.RandomSkylink()
+	sl2 := test.RandomSkylink()
+
+	srv1 := "server1"
+	srv2 := "server2"
+
+	// List all skylinks pinned by svr1. Expect an empty list.
+	ls, err := db.SkylinksForServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ls) != 0 {
+		t.Fatalf("Expected empty list, got %d entries: %+v", len(ls), ls)
+	}
+	// Add a skylink.
+	_, err = db.CreateSkylink(ctx, sl1, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure it shows up on the list.
+	ls, err = db.SkylinksForServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !test.Contains(ls, sl1.String()) {
+		t.Fatalf("Expected a list containing only %s but got %+v", sl1.String(), ls)
+	}
+	// Add another skylink.
+	_, err = db.CreateSkylink(ctx, sl2, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure it shows up on the list.
+	ls, err = db.SkylinksForServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !test.Contains(ls, sl1.String()) || !test.Contains(ls, sl2.String()) {
+		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
+	}
+	// Add a second server to sl1 and expect it to still show up on the list.
+	err = db.AddServerForSkylink(ctx, sl1, srv2, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ls, err = db.SkylinksForServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !test.Contains(ls, sl1.String()) {
+		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
+	}
+	// Remove srv1 as pinner for both sl1 and sl2.
+	err = db.RemoveServerFromSkylink(ctx, sl1, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.RemoveServerFromSkylink(ctx, sl2, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Expect an empty list for srv1.
+	ls, err = db.SkylinksForServer(ctx, srv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ls) != 0 {
+		t.Fatalf("Expected empty list, got %d entries: %+v", len(ls), ls)
+	}
+	// Expect sl1 to still appear in the list of srv2.
+	ls, err = db.SkylinksForServer(ctx, srv2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !test.Contains(ls, sl1.String()) {
+		t.Fatalf("Expected a list containing only %s but got %+v", sl1.String(), ls)
 	}
 }

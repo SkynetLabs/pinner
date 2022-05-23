@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/skynetlabs/pinner/skyd"
 	"github.com/skynetlabs/pinner/test"
-	"github.com/skynetlabs/pinner/test/mocks"
 	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -28,7 +28,7 @@ func TestScanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	skydcm := mocks.NewSkydClientMock()
+	skydcm := skyd.NewSkydClientMock()
 	scanner := workers.NewScanner(db, test.NewDiscardLogger(), cfg.MinPinners, cfg.ServerName, skydcm)
 	defer func() {
 		if e := scanner.Close(); e != nil {

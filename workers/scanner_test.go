@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/skynetlabs/pinner/skyd"
 	"github.com/skynetlabs/pinner/test"
-	"github.com/skynetlabs/pinner/test/mocks"
 	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
@@ -37,7 +37,7 @@ func TestScanner_calculateSleep(t *testing.T) {
 		},
 	}
 
-	skydMock := mocks.NewSkydClientMock()
+	skydMock := skyd.NewSkydClientMock()
 	scanner := Scanner{
 		staticSkydClient: skydMock,
 	}

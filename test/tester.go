@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/database"
-	"github.com/skynetlabs/pinner/test/mocks"
+	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
 )
@@ -37,6 +37,8 @@ type (
 		DB              *database.DB
 		FollowRedirects bool
 		Logger          *logrus.Logger
+		ServerName      string
+		SkydClient      skyd.Client
 
 		cancel context.CancelFunc
 	}
@@ -65,9 +67,9 @@ func NewTester(dbName string) (*Tester, error) {
 	}
 
 	ctxWithCancel, cancel := context.WithCancel(ctx)
-
+	skydClientMock := skyd.NewSkydClientMock()
 	// The server API encapsulates all the modules together.
-	server, err := api.New(cfg.ServerName, db, logger, mocks.NewSkydClientMock())
+	server, err := api.New(cfg.ServerName, db, logger, skydClientMock)
 	if err != nil {
 		cancel()
 		return nil, errors.AddContext(err, "failed to build the API")
@@ -94,6 +96,8 @@ func NewTester(dbName string) (*Tester, error) {
 		DB:              db,
 		FollowRedirects: true,
 		Logger:          logger,
+		SkydClient:      skydClientMock,
+		ServerName:      cfg.ServerName,
 		cancel:          cancel,
 	}
 	// Wait for the tester to be fully ready.
@@ -194,6 +198,7 @@ func (t *Tester) Request(method string, endpoint string, queryParams url.Values,
 	// return an error if the response returns a code that's not on this list.
 	acceptedResponseCodes := map[int]bool{
 		http.StatusOK:        true,
+		http.StatusAccepted:  true,
 		http.StatusNoContent: true,
 	}
 	// Use the response's body as error response on bad response codes.
@@ -203,7 +208,7 @@ func (t *Tester) Request(method string, endpoint string, queryParams url.Values,
 		}
 		return r, errors.AddContext(err, string(b))
 	}
-	if r.StatusCode == http.StatusOK {
+	if r.StatusCode == http.StatusOK || r.StatusCode == http.StatusAccepted {
 		// Process the body
 		err = json.Unmarshal(b, &obj)
 		if err != nil {
@@ -277,4 +282,21 @@ func (t *Tester) UnpinPOST(sl string) (int, error) {
 	}
 	r, err := t.Request(http.MethodPost, "/unpin", nil, body, nil, nil)
 	return r.StatusCode, err
+}
+
+// SweepPOST kicks off a background process which gets all files pinned by skyd
+// and marks them in the DB as pinned by the current server. It also goes over
+// all files in the DB that are marked as pinned by the local skyd and unmarks
+// those which are not in the list reported by skyd.
+func (t *Tester) SweepPOST() (api.SweepPOSTResponse, int, error) {
+	var resp api.SweepPOSTResponse
+	r, err := t.Request(http.MethodPost, "/sweep", nil, nil, nil, &resp)
+	return resp, r.StatusCode, err
+}
+
+// SweepStatusGET returns the status of the latest sweep.
+func (t *Tester) SweepStatusGET() (api.SweepStatus, int, error) {
+	var resp api.SweepStatus
+	r, err := t.Request(http.MethodGet, "/sweep/status", nil, nil, nil, &resp)
+	return resp, r.StatusCode, err
 }

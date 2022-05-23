@@ -90,3 +90,13 @@ func RandomSkylink() skymodules.Skylink {
 	sl, _ := skymodules.NewSkylinkV1(h, 0, 0)
 	return sl
 }
+
+// Contains checks whether the given slice contains the given element.
+func Contains[T comparable](haystack []T, needle T) bool {
+	for _, el := range haystack {
+		if needle == el {
+			return true
+		}
+	}
+	return false
+}

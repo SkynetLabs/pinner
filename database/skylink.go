@@ -209,6 +209,32 @@ func (db *DB) FindAndLockUnderpinned(ctx context.Context, server string, minPinn
 	return SkylinkFromString(result.Skylink)
 }
 
+// SkylinksForServer returns a list of skylinks pinned by the given server
+// according to the database. Note that this list doesn't necessarily match the
+// list of skylink the server is actually pinning, it's the list the database
+// knows of.
+func (db *DB) SkylinksForServer(ctx context.Context, server string) ([]string, error) {
+	c, err := db.staticDB.Collection(collSkylinks).Find(ctx, bson.M{"servers": server})
+	if errors.Contains(err, mongo.ErrNoDocuments) {
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	results := []struct {
+		Skylink string
+	}{}
+	err = c.All(ctx, &results)
+	if err != nil {
+		return nil, errors.AddContext(err, "failed to decode results")
+	}
+	skylinks := make([]string, len(results))
+	for k, v := range results {
+		skylinks[k] = v.Skylink
+	}
+	return skylinks, nil
+}
+
 // UnlockSkylink removes the lock on the skylink put while we're trying to pin
 // it to a new server.
 func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
