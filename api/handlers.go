@@ -184,7 +184,7 @@ func (api *API) threadedPerformSweep() {
 	go func() {
 		defer wg.Done()
 		res := api.staticSkydClient.RebuildCache()
-		<-res.Ch
+		<-res.ErrAvail
 		cacheErr = res.ExternErr
 	}()
 
