@@ -79,7 +79,7 @@ func (c *client) DiffPinnedSkylinks(skylinks []string) (unknown []string, missin
 // Perfect health is 0.
 func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
 	c.staticLogger.Trace("Entering FileHealth.")
-	defer c.staticLogger.Trace("Exiting FileHealth.")
+	defer c.staticLogger.Trace("Exiting  FileHealth.")
 	rf, err := c.staticClient.RenterFileRootGet(sp)
 	if err != nil {
 		return 0, err
@@ -90,7 +90,7 @@ func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
 // Metadata returns the metadata of the skylink
 func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
 	c.staticLogger.Trace("Entering Metadata.")
-	defer c.staticLogger.Trace("Exiting Metadata.")
+	defer c.staticLogger.Trace("Exiting  Metadata.")
 	_, meta, err := c.staticClient.SkynetMetadataGet(skylink)
 	if err != nil {
 		return skymodules.SkyfileMetadata{}, err
@@ -101,7 +101,7 @@ func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
 // Pin instructs the local skyd to pin the given skylink.
 func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 	c.staticLogger.Tracef("Entering Pin. Skylink: '%s'", skylink)
-	defer c.staticLogger.Tracef("Exiting Pin. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting  Pin. Skylink: '%s'", skylink)
 	_, err := database.SkylinkFromString(skylink)
 	if err != nil {
 		return skymodules.SiaPath{}, errors.Compose(err, database.ErrInvalidSkylink)
@@ -138,14 +138,14 @@ func (c *client) RenterDirRootGet(siaPath skymodules.SiaPath) (rd api.RenterDire
 // skylink is not V2.
 func (c *client) Resolve(skylink string) (string, error) {
 	c.staticLogger.Tracef("Entering Resolve. Skylink: '%s'", skylink)
-	defer c.staticLogger.Tracef("Exiting Resolve. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting  Resolve. Skylink: '%s'", skylink)
 	return c.staticClient.ResolveSkylinkV2(skylink)
 }
 
 // Unpin instructs the local skyd to unpin the given skylink.
 func (c *client) Unpin(skylink string) error {
 	c.staticLogger.Tracef("Entering Unpin. Skylink: '%s'", skylink)
-	defer c.staticLogger.Tracef("Exiting Unpin. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting  Unpin. Skylink: '%s'", skylink)
 	err := c.staticClient.SkynetSkylinkUnpinPost(skylink)
 	// Update the cached status of the skylink if there is no error or the error
 	// indicates that the skylink is blocked.
@@ -159,6 +159,6 @@ func (c *client) Unpin(skylink string) error {
 // skylink and returns true if it finds it.
 func (c *client) isPinned(skylink string) (bool, error) {
 	c.staticLogger.Tracef("Entering isPinned. Skylink: '%s'", skylink)
-	defer c.staticLogger.Tracef("Exiting isPinned. Skylink: '%s'", skylink)
+	defer c.staticLogger.Tracef("Exiting  isPinned. Skylink: '%s'", skylink)
 	return c.staticSkylinksCache.Contains(skylink), nil
 }

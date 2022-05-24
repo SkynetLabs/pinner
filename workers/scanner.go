@@ -161,7 +161,7 @@ func (s *Scanner) threadedScanAndPin() {
 // pinUnderpinnedSkylinks loops over all underpinned skylinks and pins them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
 	s.staticLogger.Trace("Entering pinUnderpinnedSkylinks.")
-	defer s.staticLogger.Trace("Exiting pinUnderpinnedSkylinks.")
+	defer s.staticLogger.Trace("Exiting  pinUnderpinnedSkylinks.")
 	for {
 		// Check for service shutdown before talking to the DB.
 		select {
@@ -187,7 +187,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 // such as bad credentials, dead skyd, etc.
 func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink, sf skymodules.SiaPath, continueScanning bool) {
 	s.staticLogger.Trace("Entering findAndPinOneUnderpinnedSkylink")
-	defer s.staticLogger.Trace("Exiting findAndPinOneUnderpinnedSkylink")
+	defer s.staticLogger.Trace("Exiting  findAndPinOneUnderpinnedSkylink")
 
 	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.minPinners)
 	if database.IsNoSkylinksNeedPinning(err) {
