@@ -314,7 +314,7 @@ func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.Sia
 		}
 		select {
 		case <-ticker.C:
-			s.staticLogger.Tracef("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
+			s.staticLogger.Debugf("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
 		case <-deadlineTimer.C:
 			s.staticLogger.Warnf("Skylink '%s' failed to reach full health within the time limit.", skylink)
 			break
