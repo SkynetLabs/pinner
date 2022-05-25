@@ -21,12 +21,16 @@ type (
 	// RebuildCacheResult informs the caller on the status of a cache rebuild.
 	// The error should not be read before the channel is closed.
 	RebuildCacheResult struct {
-		// Ch indicates the status of the cache rebuild progress - if it's not
-		// closed then the rebuild is still in progress.
-		Ch chan struct{}
+		// ErrAvail indicates the status of the cache rebuild progress -
+		// if it's not closed then the rebuild is still in progress. We expose
+		// it as a <-chan, so the receiver cannot close it.
+		ErrAvail <-chan struct{}
 		// ExternErr holds the error state of the cache rebuild process. It must
-		// only be read after Ch is closed.
+		// only be read after ErrAvail is closed.
 		ExternErr error
+		// errAvail indicates the status of the cache rebuild progress.
+		// We expose this same channel as <-chan ErrAvail.
+		errAvail chan struct{}
 	}
 )
 
@@ -91,10 +95,7 @@ func (psc *PinnedSkylinksCache) Rebuild(skydClient Client) RebuildCacheResult {
 	psc.mu.Lock()
 	defer psc.mu.Unlock()
 	if !psc.isRebuildInProgress() {
-		psc.result = &RebuildCacheResult{
-			Ch:        make(chan struct{}),
-			ExternErr: nil,
-		}
+		psc.result = NewRebuildCacheResult()
 		// Kick off the actual rebuild in a separate goroutine.
 		go psc.threadedRebuild(skydClient)
 	}
@@ -163,13 +164,23 @@ func (psc *PinnedSkylinksCache) threadedRebuild(skydClient Client) {
 	psc.mu.Unlock()
 }
 
+// NewRebuildCacheResult returns a new RebuildCacheResult
+func NewRebuildCacheResult() *RebuildCacheResult {
+	ch := make(chan struct{})
+	return &RebuildCacheResult{
+		errAvail:  ch,
+		ErrAvail:  ch,
+		ExternErr: nil,
+	}
+}
+
 // close ensures that we don't try to close the results channel more than once.
 func (rr *RebuildCacheResult) close() {
 	select {
-	case <-rr.Ch:
+	case <-rr.ErrAvail:
 		build.Critical("double close on a results channel")
 		return
 	default:
 	}
-	close(rr.Ch)
+	close(rr.errAvail)
 }
