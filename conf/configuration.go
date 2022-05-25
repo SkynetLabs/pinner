@@ -65,11 +65,11 @@ type (
 		// ServerName holds the name of the current server. This name will be
 		// used for identifying which servers are pinning a given skylink.
 		ServerName string
-		// SiaAPIPassword is the apipassword for the local skyd
+		// SiaAPIPassword is the apipassword for the local skyd.
 		SiaAPIPassword string
-		// SiaAPIHost is the hostname/IP of the local skyd
+		// SiaAPIHost is the hostname/IP of the local skyd.
 		SiaAPIHost string
-		// SiaAPIPort is the port of the local skyd
+		// SiaAPIPort is the port of the local skyd.
 		SiaAPIPort string
 	}
 )

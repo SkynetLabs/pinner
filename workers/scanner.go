@@ -37,9 +37,9 @@ import (
 
 // Handy constants used to improve readability.
 const (
+	assumedUploadSpeedInBytes = 1 << 30 / 4 / 8 // 25% of 1Gbps in bytes
 	baseSectorRedundancy      = 10
 	fanoutRedundancy          = 3
-	assumedUploadSpeedInBytes = 1 << 30 / 4 / 8 // 25% of 1Gbps in bytes
 )
 
 var (
@@ -182,18 +182,18 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 		if err == nil {
 			// Block until the pinned skylink becomes healthy or until a timeout.
 			s.waitUntilHealthy(skylink, sp)
-		} else {
-			// In case of error we still want to sleep for a moment in order to
-			// avoid a tight(ish) loop of errors when we either fail to pin or
-			// fail to mark as pinned. Note that this only happens when we want
-			// to continue scanning, otherwise we would have exited right after
-			// findAndPinOneUnderpinnedSkylink.
-			select {
-			case <-s.staticTG.StopChan():
-				s.staticLogger.Trace("Stop channel closed.")
-				return
-			case <-time.After(SleepBetweenPins):
-			}
+			continue
+		}
+		// In case of error we still want to sleep for a moment in order to
+		// avoid a tight(ish) loop of errors when we either fail to pin or
+		// fail to mark as pinned. Note that this only happens when we want
+		// to continue scanning, otherwise we would have exited right after
+		// findAndPinOneUnderpinnedSkylink.
+		select {
+		case <-s.staticTG.StopChan():
+			s.staticLogger.Trace("Stop channel closed.")
+			return
+		case <-time.After(SleepBetweenPins):
 		}
 	}
 }

@@ -221,9 +221,9 @@ func (db *DB) SkylinksForServer(ctx context.Context, server string) ([]string, e
 	if err != nil {
 		return nil, err
 	}
-	results := []struct {
+	var results []struct {
 		Skylink string
-	}{}
+	}
 	err = c.All(ctx, &results)
 	if err != nil {
 		return nil, errors.AddContext(err, "failed to decode results")
