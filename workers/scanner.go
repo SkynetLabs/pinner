@@ -95,6 +95,7 @@ type (
 		staticSkydClient skyd.Client
 		staticTG         *threadgroup.ThreadGroup
 
+		dryRun     bool
 		minPinners int
 		mu         sync.Mutex
 	}
@@ -146,6 +147,7 @@ func (s *Scanner) threadedScanAndPin() {
 				s.staticLogger.Warn(errors.AddContext(res.ExternErr, "failed to rebuild skyd client cache"))
 			}
 		}
+		s.refreshDryRun()
 		s.refreshMinPinners()
 		s.pinUnderpinnedSkylinks()
 		// Sleep between database scans.
@@ -171,7 +173,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 		default:
 		}
 
-		skylink, sp, continueScanning, err := s.findAndPinOneUnderpinnedSkylink()
+		skylink, sp, continueScanning, err := s.managedFindAndPinOneUnderpinnedSkylink()
 		if !continueScanning {
 			return
 		}
@@ -188,7 +190,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 		// avoid a tight(ish) loop of errors when we either fail to pin or
 		// fail to mark as pinned. Note that this only happens when we want
 		// to continue scanning, otherwise we would have exited right after
-		// findAndPinOneUnderpinnedSkylink.
+		// managedFindAndPinOneUnderpinnedSkylink.
 		select {
 		case <-s.staticTG.StopChan():
 			s.staticLogger.Trace("Stop channel closed.")
@@ -198,16 +200,21 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 	}
 }
 
-// findAndPinOneUnderpinnedSkylink scans the database for one skylinks which is
+// managedFindAndPinOneUnderpinnedSkylink scans the database for one skylinks which is
 // either locked by the current server or underpinned. If it finds such a
 // skylink, it pins it to the local skyd. The method returns true until it finds
 // no further skylinks to process or until it encounters an unrecoverable error,
 // such as bad credentials, dead skyd, etc.
-func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink, sf skymodules.SiaPath, continueScanning bool, err error) {
-	s.staticLogger.Trace("Entering findAndPinOneUnderpinnedSkylink")
-	defer s.staticLogger.Trace("Exiting  findAndPinOneUnderpinnedSkylink")
+func (s *Scanner) managedFindAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink, sf skymodules.SiaPath, continueScanning bool, err error) {
+	s.staticLogger.Trace("Entering managedFindAndPinOneUnderpinnedSkylink")
+	defer s.staticLogger.Trace("Exiting  managedFindAndPinOneUnderpinnedSkylink")
 
-	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.minPinners)
+	s.mu.Lock()
+	dryRun := s.dryRun
+	minPinners := s.minPinners
+	s.mu.Unlock()
+
+	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, minPinners)
 	if database.IsNoSkylinksNeedPinning(err) {
 		return skymodules.Skylink{}, skymodules.SiaPath{}, false, err
 	}
@@ -221,6 +228,12 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink,
 			s.staticLogger.Debug(errors.AddContext(err, "failed to unlock skylink after trying to pin it"))
 		}
 	}()
+
+	// Check for a dry run.
+	if dryRun {
+		s.staticLogger.Infof("[DRY RUN] Successfully pinned '%s'", sl)
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false, errors.New("dry run")
+	}
 
 	sf, err = s.staticSkydClient.Pin(sl.String())
 	if errors.Contains(err, skyd.ErrSkylinkAlreadyPinned) {
@@ -277,6 +290,19 @@ func (s *Scanner) estimateTimeToFull(skylink skymodules.Skylink) time.Duration {
 	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*modules.SectorSize
 	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
 	return time.Duration(secondsRemaining) * time.Second
+}
+
+// refreshDryRun makes sure the local value of dry_run matches the one
+// in the database.
+func (s *Scanner) refreshDryRun() {
+	dr, err := conf.DryRun(context.TODO(), s.staticDB)
+	if err != nil {
+		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for dry_run"))
+		return
+	}
+	s.mu.Lock()
+	s.dryRun = dr
+	s.mu.Unlock()
 }
 
 // refreshMinPinners makes sure the local value of min pinners matches the one
