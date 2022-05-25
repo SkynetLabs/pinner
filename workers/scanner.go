@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -72,15 +73,9 @@ var (
 		Dev:      1 * time.Minute,
 		Testing:  100 * time.Millisecond,
 	}).(time.Duration)
-	// sleepBetweenScansVariation defines how much the sleep between scans will
-	// vary between executions
-	sleepBetweenScansVariation = build.Select(build.Var{
-		// In production we want to use a prime number of hours, so we can
-		// de-sync the scan and the sweeps.
-		Standard: 2 * time.Hour,
-		Dev:      1 * time.Second,
-		Testing:  10 * time.Millisecond,
-	}).(time.Duration)
+	// sleepVariationFactor defines how much the sleep between scans will
+	// vary between executions. It represents percent.
+	sleepVariationFactor = 0.1
 )
 
 type (
@@ -89,11 +84,12 @@ type (
 	// being pinned by the local server already), Scanner pins it to the local
 	// skyd.
 	Scanner struct {
-		staticDB         *database.DB
-		staticLogger     *logrus.Logger
-		staticServerName string
-		staticSkydClient skyd.Client
-		staticTG         *threadgroup.ThreadGroup
+		staticDB                *database.DB
+		staticLogger            *logrus.Logger
+		staticServerName        string
+		staticSkydClient        skyd.Client
+		staticSleepBetweenScans time.Duration
+		staticTG                *threadgroup.ThreadGroup
 
 		minPinners int
 		mu         sync.Mutex
@@ -101,14 +97,25 @@ type (
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, skydClient skyd.Client) *Scanner {
+func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, customSleepBetweenScans string, skydClient skyd.Client) *Scanner {
+	sleep := sleepBetweenScans
+	if customSleepBetweenScans != "" {
+		hours, err := strconv.Atoi(customSleepBetweenScans)
+		if err != nil || hours < 1 {
+			logger.Warnf("Invalid value of PINNER_HOURS_BETWEEN_SCANS given, using the default of %d hours", sleepBetweenScans)
+		} else {
+			sleep = time.Duration(hours) * time.Hour
+		}
+	}
 	return &Scanner{
-		staticDB:         db,
-		staticLogger:     logger,
-		minPinners:       minPinners,
-		staticServerName: serverName,
-		staticSkydClient: skydClient,
-		staticTG:         &threadgroup.ThreadGroup{},
+		staticDB:                db,
+		staticLogger:            logger,
+		staticServerName:        serverName,
+		staticSkydClient:        skydClient,
+		staticSleepBetweenScans: sleep,
+		staticTG:                &threadgroup.ThreadGroup{},
+
+		minPinners: minPinners,
 	}
 }
 
@@ -150,7 +157,7 @@ func (s *Scanner) threadedScanAndPin() {
 		s.pinUnderpinnedSkylinks()
 		// Sleep between database scans.
 		select {
-		case <-time.After(SleepBetweenScans()):
+		case <-time.After(s.SleepBetweenScans()):
 		case <-s.staticTG.StopChan():
 			s.staticLogger.Trace("Stopping scanner.")
 			return
@@ -309,10 +316,12 @@ func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.Sia
 }
 
 // SleepBetweenScans defines how often we'll scan the DB for underpinned
-// skylinks. The returned value varies by +/-sleepBetweenScansVariation and it's
+// skylinks. The returned value varies by +/-sleepVariationFactor and it's
 // centered on sleepBetweenScans.
-func SleepBetweenScans() time.Duration {
-	return sleepBetweenScans - sleepBetweenScansVariation + time.Duration(fastrand.Intn(2*int(sleepBetweenScansVariation)))
+func (s *Scanner) SleepBetweenScans() time.Duration {
+	sleep := float64(s.staticSleepBetweenScans)
+	sleepVar := sleep * sleepVariationFactor
+	return time.Duration(sleep-sleepVar) + time.Duration(fastrand.Intn(int(2*sleepVar)))
 }
 
 // deadline calculates how much we are willing to wait for a skylink to be fully

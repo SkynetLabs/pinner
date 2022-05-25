@@ -65,12 +65,14 @@ type (
 		// ServerName holds the name of the current server. This name will be
 		// used for identifying which servers are pinning a given skylink.
 		ServerName string
-		// SiaAPIPassword is the apipassword for the local skyd
+		// SiaAPIPassword is the apipassword for the local skyd.
 		SiaAPIPassword string
-		// SiaAPIHost is the hostname/IP of the local skyd
+		// SiaAPIHost is the hostname/IP of the local skyd.
 		SiaAPIHost string
-		// SiaAPIPort is the port of the local skyd
+		// SiaAPIPort is the port of the local skyd.
 		SiaAPIPort string
+		// SleepBetweenScans defines the time between scans in hours.
+		SleepBetweenScans string
 	}
 )
 
@@ -124,6 +126,9 @@ func LoadConfig() (Config, error) {
 	}
 	if val, ok = os.LookupEnv("PINNER_LOG_LEVEL"); ok {
 		cfg.LogLevel = val
+	}
+	if val, ok = os.LookupEnv("PINNER_HOURS_BETWEEN_SCANS"); ok {
+		cfg.SleepBetweenScans = val
 	}
 	if val, ok = os.LookupEnv("API_HOST"); ok {
 		cfg.SiaAPIHost = val

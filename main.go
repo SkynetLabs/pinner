@@ -39,7 +39,7 @@ func main() {
 
 	// Start the background scanner.
 	skydClient := skyd.NewClient(cfg.SiaAPIHost, cfg.SiaAPIPort, cfg.SiaAPIPassword, skyd.NewCache(), logger)
-	scanner := workers.NewScanner(db, logger, cfg.MinPinners, cfg.ServerName, skydClient)
+	scanner := workers.NewScanner(db, logger, cfg.MinPinners, cfg.ServerName, cfg.SleepBetweenScans, skydClient)
 	err = scanner.Start()
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to start Scanner"))
