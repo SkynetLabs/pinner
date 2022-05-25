@@ -141,7 +141,7 @@ func (s *Scanner) threadedScanAndPin() {
 		select {
 		case <-s.staticTG.StopChan():
 			return
-		case <-res.Ch:
+		case <-res.ErrAvail:
 			if res.ExternErr != nil {
 				s.staticLogger.Warn(errors.AddContext(res.ExternErr, "failed to rebuild skyd client cache"))
 			}
