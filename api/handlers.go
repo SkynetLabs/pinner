@@ -203,7 +203,7 @@ func (api *API) threadedPerformSweep() {
 	}
 	wg.Wait()
 	if cacheErr != nil {
-		err = errors.AddContext(cacheErr, "failed to revuild skyd cache")
+		err = errors.AddContext(cacheErr, "failed to rebuild skyd cache")
 		return
 	}
 

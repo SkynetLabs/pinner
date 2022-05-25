@@ -93,7 +93,7 @@ func (db *DB) FindSkylink(ctx context.Context, skylink skymodules.Skylink) (Skyl
 // that Pinner should make sure it's pinned by the minimum number of servers.
 func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error {
 	db.staticLogger.Tracef("Entering MarkPinned. Skylink: '%s'", skylink)
-	defer db.staticLogger.Tracef("Exiting MarkPinned. Skylink: '%s'", skylink)
+	defer db.staticLogger.Tracef("Exiting  MarkPinned. Skylink: '%s'", skylink)
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"pinned": true}}
 	opts := options.Update().SetUpsert(true)
@@ -105,7 +105,7 @@ func (db *DB) MarkPinned(ctx context.Context, skylink skymodules.Skylink) error 
 // should stop pinning it.
 func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) error {
 	db.staticLogger.Tracef("Entering MarkUnpinned. Skylink: '%s'", skylink)
-	defer db.staticLogger.Tracef("Exiting MarkUnpinned. Skylink: '%s'", skylink)
+	defer db.staticLogger.Tracef("Exiting  MarkUnpinned. Skylink: '%s'", skylink)
 	filter := bson.M{"skylink": skylink.String()}
 	update := bson.M{"$set": bson.M{"pinned": false}}
 	opts := options.Update().SetUpsert(true)
@@ -125,7 +125,7 @@ func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) erro
 // a server sweep and documenting which skylinks are pinned by this server.
 func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylink, server string, markPinned bool) error {
 	db.staticLogger.Tracef("Entering AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Tracef("Exiting AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
+	defer db.staticLogger.Tracef("Exiting  AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
 	filter := bson.M{"skylink": skylink.String()}
 	var update bson.M
 	if markPinned {
@@ -146,7 +146,7 @@ func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylin
 // not be inserted.
 func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
 	db.staticLogger.Tracef("Entering RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Tracef("Exiting RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
+	defer db.staticLogger.Tracef("Exiting  RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
 	filter := bson.M{
 		"skylink": skylink.String(),
 		"servers": server,
@@ -221,9 +221,9 @@ func (db *DB) SkylinksForServer(ctx context.Context, server string) ([]string, e
 	if err != nil {
 		return nil, err
 	}
-	results := []struct {
+	var results []struct {
 		Skylink string
-	}{}
+	}
 	err = c.All(ctx, &results)
 	if err != nil {
 		return nil, errors.AddContext(err, "failed to decode results")
@@ -239,7 +239,7 @@ func (db *DB) SkylinksForServer(ctx context.Context, server string) ([]string, e
 // it to a new server.
 func (db *DB) UnlockSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
 	db.staticLogger.Tracef("Entering UnlockSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Tracef("Exiting UnlockSkylink. Skylink: '%s', server: '%s'", skylink, server)
+	defer db.staticLogger.Tracef("Exiting  UnlockSkylink. Skylink: '%s', server: '%s'", skylink, server)
 	filter := bson.M{
 		"skylink":   skylink.String(),
 		"locked_by": server,
