@@ -147,9 +147,11 @@ func (s *Scanner) threadedScanAndPin() {
 				s.staticLogger.Warn(errors.AddContext(res.ExternErr, "failed to rebuild skyd client cache"))
 			}
 		}
+
 		s.refreshDryRun()
 		s.refreshMinPinners()
 		s.pinUnderpinnedSkylinks()
+
 		// Sleep between database scans.
 		select {
 		case <-time.After(SleepBetweenScans()):
