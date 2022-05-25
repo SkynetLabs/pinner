@@ -110,7 +110,8 @@ func (c *ClientMock) RebuildCache() RebuildCacheResult {
 	// Do some work. There are tests which rely on this value to be above 50ms.
 	time.Sleep(100 * time.Millisecond)
 	return RebuildCacheResult{
-		Ch:        closedCh,
+		errAvail:  closedCh,
+		ErrAvail:  closedCh,
 		ExternErr: nil,
 	}
 }
