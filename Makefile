@@ -1,10 +1,10 @@
 # These variables get inserted into ./build/commit.go
-BUILD_TIME=$(shell date)
+BUILD_TIME=$(shell date -u)
 GIT_REVISION=$(shell git rev-parse --short HEAD)
 GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
 
-ldflags= -X github.com/SkynetLabs/pinner/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
--X "github.com/SkynetLabs/pinner/build.BuildTime=${BUILD_TIME}"
+ldflags= -X "github.com/skynetlabs/pinner/build.GitRevision=${GIT_DIRTY}${GIT_REVISION}" \
+-X "github.com/skynetlabs/pinner/build.BuildTime=${BUILD_TIME}"
 
 racevars= history_size=3 halt_on_error=1 atexit_sleep_ms=2000
 
