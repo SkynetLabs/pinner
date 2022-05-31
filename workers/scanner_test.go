@@ -17,23 +17,23 @@ func TestScanner_calculateSleep(t *testing.T) {
 	}{
 		"small file": {
 			1 << 20, // 1 MB
-			4 * time.Second,
+			3 * time.Second,
 		},
 		"5 MB": {
 			1 << 20 * 5, // 5 MB
-			4 * time.Second,
+			3 * time.Second,
 		},
 		"50 MB": {
 			1 << 20 * 50, // 50 MB
-			8 * time.Second,
+			7 * time.Second,
 		},
 		"500 MB": {
 			1 << 20 * 500, // 500 MB
-			49 * time.Second,
+			48 * time.Second,
 		},
 		"5 GB": {
 			1 << 30 * 5, // 5 GB
-			481 * time.Second,
+			480 * time.Second,
 		},
 	}
 
