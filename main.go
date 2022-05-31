@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/sirupsen/logrus"
@@ -53,7 +52,7 @@ func main() {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
 
-	fmt.Printf("Starting Pinner service.\nGitRevision: %v (built %v)\n", build.GitRevision, build.BuildTime)
+	logger.Printf("Starting Pinner service.\nGitRevision: %v (built %v)\n", build.GitRevision, build.BuildTime)
 	err = server.ListenAndServe(4000)
 	log.Fatal(errors.Compose(err, scanner.Close()))
 }
