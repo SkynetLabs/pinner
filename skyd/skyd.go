@@ -126,6 +126,8 @@ func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 // on which the caller can either wait or select. The caller can check whether
 // the rebuild was successful by calling Error().
 func (c *client) RebuildCache() RebuildCacheResult {
+	c.staticLogger.Trace("Entering RebuildCache.")
+	defer c.staticLogger.Trace("Exiting  RebuildCache.")
 	return c.staticSkylinksCache.Rebuild(c)
 }
 

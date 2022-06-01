@@ -155,9 +155,11 @@ func (s *Scanner) threadedScanAndPin() {
 			}
 		}
 
+		s.staticLogger.Tracef("Start scanning.")
 		s.refreshDryRun()
 		s.refreshMinPinners()
 		s.pinUnderpinnedSkylinks()
+		s.staticLogger.Tracef("End scanning.")
 
 		// Sleep between database scans.
 		select {
@@ -309,6 +311,7 @@ func (s *Scanner) refreshDryRun() {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for dry_run"))
 		return
 	}
+	s.staticLogger.Tracef("Current dry_run value: %t", dr)
 	s.mu.Lock()
 	s.dryRun = dr
 	s.mu.Unlock()
