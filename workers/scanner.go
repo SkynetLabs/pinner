@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -98,15 +97,10 @@ type (
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, customSleepBetweenScans string, skydClient skyd.Client) *Scanner {
+func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, customSleepBetweenScans time.Duration, skydClient skyd.Client) *Scanner {
 	sleep := sleepBetweenScans
-	if customSleepBetweenScans != "" {
-		hours, err := strconv.Atoi(customSleepBetweenScans)
-		if err != nil || hours < 1 {
-			logger.Warnf("Invalid value of PINNER_HOURS_BETWEEN_SCANS given, using the default of %d hours", sleepBetweenScans)
-		} else {
-			sleep = time.Duration(hours) * time.Hour
-		}
+	if customSleepBetweenScans > 0 {
+		sleep = customSleepBetweenScans
 	}
 	return &Scanner{
 		staticDB:                db,

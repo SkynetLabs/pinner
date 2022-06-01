@@ -38,7 +38,7 @@ func TestScanner(t *testing.T) {
 		t.Fatal(err)
 	}
 	skydcm := skyd.NewSkydClientMock()
-	scanner := workers.NewScanner(db, test.NewDiscardLogger(), cfg.MinPinners, "", cfg.ServerName, skydcm)
+	scanner := workers.NewScanner(db, test.NewDiscardLogger(), cfg.MinPinners, cfg.ServerName, cfg.SleepBetweenScans, skydcm)
 	defer func() {
 		if e := scanner.Close(); e != nil {
 			t.Error(errors.AddContext(e, "failed to close threadgroup"))
