@@ -57,7 +57,7 @@ func TestScanner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Sleep for two cycles.
+	// Sleep for a while, giving a chance to the scanner to pick the skylink up.
 	time.Sleep(cyclesToWait * workers.SleepBetweenScans())
 	// Make sure the skylink isn't pinned on the local (mock) skyd.
 	if skydcm.IsPinning(sl.String()) {
@@ -132,7 +132,7 @@ func TestScannerDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep for two cycles.
+	// Sleep for a while, giving a chance to the scanner to pick the skylink up.
 	time.Sleep(cyclesToWait * workers.SleepBetweenScans())
 	// Make sure the skylink isn't pinned on the local (mock) skyd.
 	if skydcm.IsPinning(sl.String()) {
