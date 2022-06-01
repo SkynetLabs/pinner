@@ -27,6 +27,12 @@ const (
 // Cluster-wide configuration variable names.
 // Stored in the database.
 const (
+	// ConfDryRun holds the name of the configuration setting which defines
+	// whether we execute pin/unpin calls against skyd or not. Note that all
+	// database operations will still be executed, i.e. skylinks records will
+	// be updated. After using this option you will need to prune the database
+	// before being able to use the service in "actual mode".
+	ConfDryRun = "dry_run"
 	// ConfMinPinners holds the name of the configuration setting which defines
 	// the minimum number of pinners we want to ensure for each skyfile.
 	ConfMinPinners = "min_pinners"
@@ -138,6 +144,24 @@ func LoadConfig() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// DryRun returns the cluster-wide value of the dry_run switch. This switch
+// tells Pinner to omit the pin/unpin calls to skyd and assume they were
+// successful.
+func DryRun(ctx context.Context, db *database.DB) (bool, error) {
+	val, err := db.ConfigValue(ctx, ConfDryRun)
+	if errors.Contains(err, mongo.ErrNoDocuments) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	dr, err := strconv.ParseBool(val)
+	if err != nil {
+		return false, err
+	}
+	return dr, nil
 }
 
 // MinPinners returns the cluster-wide value of the minimum number of servers we

@@ -38,9 +38,9 @@ import (
 
 // Handy constants used to improve readability.
 const (
+	assumedUploadSpeedInBytes = 1 << 30 / 4 / 8 // 25% of 1Gbps in bytes
 	baseSectorRedundancy      = 10
 	fanoutRedundancy          = 3
-	assumedUploadSpeedInBytes = 1 << 30 / 4 / 8 // 25% of 1Gbps in bytes
 )
 
 var (
@@ -91,6 +91,7 @@ type (
 		staticSleepBetweenScans time.Duration
 		staticTG                *threadgroup.ThreadGroup
 
+		dryRun     bool
 		minPinners int
 		mu         sync.Mutex
 	}
@@ -148,13 +149,16 @@ func (s *Scanner) threadedScanAndPin() {
 		select {
 		case <-s.staticTG.StopChan():
 			return
-		case <-res.Ch:
+		case <-res.ErrAvail:
 			if res.ExternErr != nil {
 				s.staticLogger.Warn(errors.AddContext(res.ExternErr, "failed to rebuild skyd client cache"))
 			}
 		}
+
+		s.refreshDryRun()
 		s.refreshMinPinners()
 		s.pinUnderpinnedSkylinks()
+
 		// Sleep between database scans.
 		select {
 		case <-time.After(s.SleepBetweenScans()):
@@ -168,7 +172,7 @@ func (s *Scanner) threadedScanAndPin() {
 // pinUnderpinnedSkylinks loops over all underpinned skylinks and pins them.
 func (s *Scanner) pinUnderpinnedSkylinks() {
 	s.staticLogger.Trace("Entering pinUnderpinnedSkylinks.")
-	defer s.staticLogger.Trace("Exiting pinUnderpinnedSkylinks.")
+	defer s.staticLogger.Trace("Exiting  pinUnderpinnedSkylinks.")
 	for {
 		// Check for service shutdown before talking to the DB.
 		select {
@@ -178,31 +182,54 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 		default:
 		}
 
-		skylink, sp, continueScanning := s.findAndPinOneUnderpinnedSkylink()
+		skylink, sp, continueScanning, err := s.managedFindAndPinOneUnderpinnedSkylink()
 		if !continueScanning {
 			return
 		}
-		// Block until the pinned skylink becomes healthy or until a timeout.
-		s.waitUntilHealthy(skylink, sp)
+		// We only check the error if we want to continue scanning. The error is
+		// already logged and the only indication it gives us is whether we
+		// should wait for the file we pinned to become healthy or not. If there
+		// is an error, then there is nothing to wait for.
+		if err == nil {
+			// Block until the pinned skylink becomes healthy or until a timeout.
+			s.waitUntilHealthy(skylink, sp)
+			continue
+		}
+		// In case of error we still want to sleep for a moment in order to
+		// avoid a tight(ish) loop of errors when we either fail to pin or
+		// fail to mark as pinned. Note that this only happens when we want
+		// to continue scanning, otherwise we would have exited right after
+		// managedFindAndPinOneUnderpinnedSkylink.
+		select {
+		case <-s.staticTG.StopChan():
+			s.staticLogger.Trace("Stop channel closed.")
+			return
+		case <-time.After(SleepBetweenPins):
+		}
 	}
 }
 
-// findAndPinOneUnderpinnedSkylink scans the database for one skylinks which is
+// managedFindAndPinOneUnderpinnedSkylink scans the database for one skylinks which is
 // either locked by the current server or underpinned. If it finds such a
 // skylink, it pins it to the local skyd. The method returns true until it finds
 // no further skylinks to process or until it encounters an unrecoverable error,
 // such as bad credentials, dead skyd, etc.
-func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink, sf skymodules.SiaPath, continueScanning bool) {
-	s.staticLogger.Trace("Entering findAndPinOneUnderpinnedSkylink")
-	defer s.staticLogger.Trace("Exiting findAndPinOneUnderpinnedSkylink")
+func (s *Scanner) managedFindAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink, sf skymodules.SiaPath, continueScanning bool, err error) {
+	s.staticLogger.Trace("Entering managedFindAndPinOneUnderpinnedSkylink")
+	defer s.staticLogger.Trace("Exiting  managedFindAndPinOneUnderpinnedSkylink")
 
-	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, s.minPinners)
+	s.mu.Lock()
+	dryRun := s.dryRun
+	minPinners := s.minPinners
+	s.mu.Unlock()
+
+	sl, err := s.staticDB.FindAndLockUnderpinned(context.TODO(), s.staticServerName, minPinners)
 	if database.IsNoSkylinksNeedPinning(err) {
-		return skymodules.Skylink{}, skymodules.SiaPath{}, false
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false, err
 	}
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch underpinned skylink"))
-		return skymodules.Skylink{}, skymodules.SiaPath{}, false
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false, err
 	}
 	defer func() {
 		err = s.staticDB.UnlockSkylink(context.TODO(), sl, s.staticServerName)
@@ -210,6 +237,12 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink,
 			s.staticLogger.Debug(errors.AddContext(err, "failed to unlock skylink after trying to pin it"))
 		}
 	}()
+
+	// Check for a dry run.
+	if dryRun {
+		s.staticLogger.Infof("[DRY RUN] Successfully pinned '%s'", sl)
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false, errors.New("dry run")
+	}
 
 	sf, err = s.staticSkydClient.Pin(sl.String())
 	if errors.Contains(err, skyd.ErrSkylinkAlreadyPinned) {
@@ -219,26 +252,26 @@ func (s *Scanner) findAndPinOneUnderpinnedSkylink() (skylink skymodules.Skylink,
 		if err != nil {
 			s.staticLogger.Debug(errors.AddContext(err, "failed to mark as pinned by this server"))
 		}
-		return skymodules.Skylink{}, skymodules.SiaPath{}, true
+		return skymodules.Skylink{}, skymodules.SiaPath{}, true, err
 	}
 	if err != nil && (strings.Contains(err.Error(), "API authentication failed.") ||
 		strings.Contains(err.Error(), "connect: connection refused")) {
 		err = errors.AddContext(err, fmt.Sprintf("unrecoverable error while pinning '%s'", sl))
 		s.staticLogger.Error(err)
-		return skymodules.Skylink{}, skymodules.SiaPath{}, false
+		return skymodules.Skylink{}, skymodules.SiaPath{}, false, err
 	}
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, fmt.Sprintf("failed to pin '%s'", sl)))
 		// Since this is not an unrecoverable error, we'll signal the caller to
 		// continue trying to pin other skylinks.
-		return skymodules.Skylink{}, skymodules.SiaPath{}, true
+		return skymodules.Skylink{}, skymodules.SiaPath{}, true, err
 	}
 	s.staticLogger.Infof("Successfully pinned '%s'", sl)
 	err = s.staticDB.AddServerForSkylink(context.TODO(), sl, s.staticServerName, false)
 	if err != nil {
 		s.staticLogger.Debug(errors.AddContext(err, "failed to mark as pinned by this server"))
 	}
-	return sl, sf, true
+	return sl, sf, true, nil
 }
 
 // estimateTimeToFull calculates how long we should sleep after pinning the given
@@ -254,7 +287,6 @@ func (s *Scanner) estimateTimeToFull(skylink skymodules.Skylink) time.Duration {
 	if err != nil {
 		err = errors.AddContext(err, "failed to get metadata for skylink")
 		s.staticLogger.Error(err)
-		build.Critical(err)
 		return SleepBetweenPins
 	}
 	chunkSize := 10 * modules.SectorSizeStandard
@@ -267,6 +299,19 @@ func (s *Scanner) estimateTimeToFull(skylink skymodules.Skylink) time.Duration {
 	remainingUpload := numChunks*chunkSize*fanoutRedundancy + (baseSectorRedundancy-1)*modules.SectorSize
 	secondsRemaining := remainingUpload / assumedUploadSpeedInBytes
 	return time.Duration(secondsRemaining) * time.Second
+}
+
+// refreshDryRun makes sure the local value of dry_run matches the one
+// in the database.
+func (s *Scanner) refreshDryRun() {
+	dr, err := conf.DryRun(context.TODO(), s.staticDB)
+	if err != nil {
+		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for dry_run"))
+		return
+	}
+	s.mu.Lock()
+	s.dryRun = dr
+	s.mu.Unlock()
 }
 
 // refreshMinPinners makes sure the local value of min pinners matches the one
@@ -296,7 +341,6 @@ func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.Sia
 		if err != nil {
 			err = errors.AddContext(err, "failed to get sia file's health")
 			s.staticLogger.Error(err)
-			build.Critical(err)
 			break
 		}
 		if health == 0 {
@@ -305,7 +349,7 @@ func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.Sia
 		}
 		select {
 		case <-ticker.C:
-			s.staticLogger.Tracef("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
+			s.staticLogger.Debugf("Waiting for '%s' to become fully healthy. Current health: %.2f", skylink, health)
 		case <-deadlineTimer.C:
 			s.staticLogger.Warnf("Skylink '%s' failed to reach full health within the time limit.", skylink)
 			break

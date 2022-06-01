@@ -38,6 +38,7 @@ jobs:
         run: make lint
       - name: Run unit tests
         run: make test
+      # TODO: Run long tests once we get mongo working in CI.
 
   # Make a release if this is a manually trigger job, i.e. workflow_dispatch
   release:

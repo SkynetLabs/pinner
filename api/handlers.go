@@ -184,7 +184,7 @@ func (api *API) threadedPerformSweep() {
 	go func() {
 		defer wg.Done()
 		res := api.staticSkydClient.RebuildCache()
-		<-res.Ch
+		<-res.ErrAvail
 		cacheErr = res.ExternErr
 	}()
 
@@ -203,7 +203,7 @@ func (api *API) threadedPerformSweep() {
 	}
 	wg.Wait()
 	if cacheErr != nil {
-		err = errors.AddContext(cacheErr, "failed to revuild skyd cache")
+		err = errors.AddContext(cacheErr, "failed to rebuild skyd cache")
 		return
 	}
 

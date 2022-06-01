@@ -15,10 +15,13 @@ all: release
 count = 1
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-pkgs = ./ ./api ./database ./skyd
+pkgs = ./ ./api ./database ./skyd ./test ./test/workers
 
 # integration-pkgs defines the packages which contain integration tests
 integration-pkgs = ./test ./test/api ./test/database
+
+# run determines which tests run when running any variation of 'make test'.
+run = .
 
 # fmt calls go fmt on all packages.
 fmt:
