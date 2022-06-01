@@ -10,6 +10,14 @@ import (
 	"github.com/skynetlabs/pinner/test"
 	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/SkynetLabs/skyd/build"
+)
+
+const (
+	// cyclesToWait establishes a common number of SleepBetweenScans cycles we
+	// should wait until we consider that a file has been or hasn't been picked
+	// by the scanner.
+	cyclesToWait = 10
 )
 
 // TestScanner ensures that Scanner does its job.
@@ -48,8 +56,9 @@ func TestScanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep for two cycles.
-	time.Sleep(2 * scanner.SleepBetweenScans())
+
+	// Sleep for a while, giving a chance to the scanner to pick the skylink up.
+	time.Sleep(cyclesToWait * scanner.SleepBetweenScans())
 	// Make sure the skylink isn't pinned on the local (mock) skyd.
 	if skydcm.IsPinning(sl.String()) {
 		t.Fatal("We didn't expect skyd to be pinning this.")
@@ -60,12 +69,16 @@ func TestScanner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Wait - the skylink should be picked up and pinned on the local skyd.
-	time.Sleep(3 * scanner.SleepBetweenScans())
-
-	// Make sure the skylink is pinned on the local (mock) skyd.
-	if !skydcm.IsPinning(sl.String()) {
-		t.Fatal("We expected skyd to be pinning this.")
+	// Wait for the skylink should be picked up and pinned on the local skyd.
+	err = build.Retry(cyclesToWait, scanner.SleepBetweenScans(), func() error {
+		// Make sure the skylink is pinned on the local (mock) skyd.
+		if !skydcm.IsPinning(sl.String()) {
+			return errors.New("we expected skyd to be pinning this")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -119,8 +132,8 @@ func TestScannerDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep for two cycles.
-	time.Sleep(2 * scanner.SleepBetweenScans())
+	// Sleep for a while, giving a chance to the scanner to pick the skylink up.
+	time.Sleep(cyclesToWait * scanner.SleepBetweenScans())
 	// Make sure the skylink isn't pinned on the local (mock) skyd.
 	if skydcm.IsPinning(sl.String()) {
 		t.Fatal("We didn't expect skyd to be pinning this.")
@@ -132,7 +145,7 @@ func TestScannerDryRun(t *testing.T) {
 	}
 
 	// Wait - the skylink should not be picked up and pinned on the local skyd.
-	time.Sleep(3 * scanner.SleepBetweenScans())
+	time.Sleep(cyclesToWait * scanner.SleepBetweenScans())
 
 	// Verify skyd doesn't have the pin.
 	//
@@ -147,14 +160,15 @@ func TestScannerDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify skyd gets the pin.
-	//
-	// Wait enough time for the pinner to pick up the new value for dry_run and
-	// rescan.
-	time.Sleep(10 * scanner.SleepBetweenScans())
-
-	// Make sure the skylink is pinned on the local (mock) skyd.
-	if !skydcm.IsPinning(sl.String()) {
-		t.Fatal("We expected skyd to be pinning this.")
+	// Wait for the skylink should be picked up and pinned on the local skyd.
+	err = build.Retry(cyclesToWait, scanner.SleepBetweenScans(), func() error {
+		// Make sure the skylink is pinned on the local (mock) skyd.
+		if !skydcm.IsPinning(sl.String()) {
+			return errors.New("we expected skyd to be pinning this")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
