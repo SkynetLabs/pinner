@@ -130,13 +130,13 @@ bench: fmt
 test:
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=. -count=$(count)
 
-test-long: lint lint-ci
+test-long: lint lint-ci start-mongo
 	@mkdir -p cover
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=60s $(pkgs) -run=$(run) -count=$(count)
-
-test-int: test-long start-mongo
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -tags='testing debug netgo' -timeout=600s $(integration-pkgs) -run=$(run) -count=$(count)
 	-make stop-mongo
+
+test-int: test-long
 
 run-dev:
 	go run -tags="dev" .
