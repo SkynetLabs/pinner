@@ -18,7 +18,7 @@ count = 1
 pkgs = ./ ./api ./conf ./database ./skyd ./test ./workers
 
 # integration-pkgs defines the packages which contain integration tests
-integration-pkgs = ./test ./test/api ./test/database ./test/workers
+integration-pkgs = ./test ./test/api ./test/database
 
 # run determines which tests run when running any variation of 'make test'.
 run = .
@@ -136,9 +136,6 @@ test-long: lint lint-ci start-mongo
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=60s $(pkgs) -run=$(run) -count=$(count)
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -tags='testing debug netgo' -timeout=600s $(integration-pkgs) -run=$(run) -count=$(count)
 	-make stop-mongo
-
-# Having this in place keeps the "testing interface" of the service compatible with accounts, blocker and so on.
-test-int: test-long
 
 run-dev:
 	go run -tags="dev" .
