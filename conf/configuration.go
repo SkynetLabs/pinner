@@ -3,8 +3,10 @@ package conf
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/skynetlabs/pinner/database"
@@ -77,6 +79,8 @@ type (
 		SiaAPIHost string
 		// SiaAPIPort is the port of the local skyd.
 		SiaAPIPort string
+		// SleepBetweenScans defines the time between scans in hours.
+		SleepBetweenScans time.Duration
 	}
 )
 
@@ -130,6 +134,17 @@ func LoadConfig() (Config, error) {
 	}
 	if val, ok = os.LookupEnv("PINNER_LOG_LEVEL"); ok {
 		cfg.LogLevel = val
+	}
+	if val, ok = os.LookupEnv("PINNER_SLEEP_BETWEEN_SCANS"); ok {
+		// Check for a bare number and interpret that as seconds.
+		if _, err := strconv.ParseInt(val, 0, 0); err == nil {
+			val += "s"
+		}
+		dur, err := time.ParseDuration(val)
+		if err != nil {
+			log.Fatalf("PINNER_SLEEP_BETWEEN_SCANS has an invalid value of '%s'", val)
+		}
+		cfg.SleepBetweenScans = dur
 	}
 	if val, ok = os.LookupEnv("API_HOST"); ok {
 		cfg.SiaAPIHost = val

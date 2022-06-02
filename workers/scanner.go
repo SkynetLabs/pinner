@@ -72,15 +72,9 @@ var (
 		Dev:      1 * time.Minute,
 		Testing:  100 * time.Millisecond,
 	}).(time.Duration)
-	// sleepBetweenScansVariation defines how much the sleep between scans will
-	// vary between executions
-	sleepBetweenScansVariation = build.Select(build.Var{
-		// In production we want to use a prime number of hours, so we can
-		// de-sync the scan and the sweeps.
-		Standard: 2 * time.Hour,
-		Dev:      1 * time.Second,
-		Testing:  10 * time.Millisecond,
-	}).(time.Duration)
+	// sleepVariationFactor defines how much the sleep between scans will
+	// vary between executions. It represents percent.
+	sleepVariationFactor = 0.1
 )
 
 type (
@@ -89,11 +83,12 @@ type (
 	// being pinned by the local server already), Scanner pins it to the local
 	// skyd.
 	Scanner struct {
-		staticDB         *database.DB
-		staticLogger     *logrus.Logger
-		staticServerName string
-		staticSkydClient skyd.Client
-		staticTG         *threadgroup.ThreadGroup
+		staticDB                *database.DB
+		staticLogger            *logrus.Logger
+		staticServerName        string
+		staticSkydClient        skyd.Client
+		staticSleepBetweenScans time.Duration
+		staticTG                *threadgroup.ThreadGroup
 
 		dryRun     bool
 		minPinners int
@@ -102,14 +97,20 @@ type (
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, skydClient skyd.Client) *Scanner {
+func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, customSleepBetweenScans time.Duration, skydClient skyd.Client) *Scanner {
+	sleep := sleepBetweenScans
+	if customSleepBetweenScans > 0 {
+		sleep = customSleepBetweenScans
+	}
 	return &Scanner{
-		staticDB:         db,
-		staticLogger:     logger,
-		minPinners:       minPinners,
-		staticServerName: serverName,
-		staticSkydClient: skydClient,
-		staticTG:         &threadgroup.ThreadGroup{},
+		staticDB:                db,
+		staticLogger:            logger,
+		staticServerName:        serverName,
+		staticSkydClient:        skydClient,
+		staticSleepBetweenScans: sleep,
+		staticTG:                &threadgroup.ThreadGroup{},
+
+		minPinners: minPinners,
 	}
 }
 
@@ -148,13 +149,15 @@ func (s *Scanner) threadedScanAndPin() {
 			}
 		}
 
+		s.staticLogger.Tracef("Start scanning.")
 		s.managedRefreshDryRun()
 		s.managedRefreshMinPinners()
 		s.managedPinUnderpinnedSkylinks()
+		s.staticLogger.Tracef("End scanning.")
 
 		// Sleep between database scans.
 		select {
-		case <-time.After(SleepBetweenScans()):
+		case <-time.After(s.SleepBetweenScans()):
 		case <-s.staticTG.StopChan():
 			s.staticLogger.Trace("Stopping scanner.")
 			return
@@ -303,6 +306,7 @@ func (s *Scanner) managedRefreshDryRun() {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for dry_run"))
 		return
 	}
+	s.staticLogger.Tracef("Current dry_run value: %t", dr)
 	s.mu.Lock()
 	s.dryRun = dr
 	s.mu.Unlock()
@@ -339,8 +343,9 @@ func (s *Scanner) managedWaitUntilHealthy(skylink skymodules.Skylink, sp skymodu
 			s.staticLogger.Error(err)
 			break
 		}
-		if health == 0 {
-			// The file is now fully uploaded and healthy.
+		// We use NeedsRepair instead of comparing the health to zero because
+		// skyd might stop repairing the file before it reaches perfect health.
+		if !skymodules.NeedsRepair(health) {
 			break
 		}
 		select {
@@ -356,10 +361,14 @@ func (s *Scanner) managedWaitUntilHealthy(skylink skymodules.Skylink, sp skymodu
 }
 
 // SleepBetweenScans defines how often we'll scan the DB for underpinned
-// skylinks. The returned value varies by +/-sleepBetweenScansVariation and it's
+// skylinks. The returned value varies by +/-sleepVariationFactor and it's
 // centered on sleepBetweenScans.
-func SleepBetweenScans() time.Duration {
-	return sleepBetweenScans - sleepBetweenScansVariation + time.Duration(fastrand.Intn(2*int(sleepBetweenScansVariation)))
+func (s *Scanner) SleepBetweenScans() time.Duration {
+	variation := int(float64(s.staticSleepBetweenScans) * sleepVariationFactor)
+	upper := int(s.staticSleepBetweenScans) + variation
+	lower := int(s.staticSleepBetweenScans) - variation
+	rng := upper - lower
+	return time.Duration(fastrand.Intn(rng) + lower)
 }
 
 // staticDeadline calculates how much we are willing to wait for a skylink to be fully
