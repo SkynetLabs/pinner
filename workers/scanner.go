@@ -340,8 +340,9 @@ func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.Sia
 			s.staticLogger.Error(err)
 			break
 		}
-		if health == 0 {
-			// The file is now fully uploaded and healthy.
+		// We use NeedsRepair instead of comparing the health to zero because
+		// skyd might stop repairing the file before it reaches perfect health.
+		if !skymodules.NeedsRepair(health) {
 			break
 		}
 		select {
