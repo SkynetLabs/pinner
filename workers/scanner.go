@@ -360,9 +360,11 @@ func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.Sia
 // skylinks. The returned value varies by +/-sleepVariationFactor and it's
 // centered on sleepBetweenScans.
 func (s *Scanner) SleepBetweenScans() time.Duration {
-	sleep := float64(s.staticSleepBetweenScans)
-	sleepVar := sleep * sleepVariationFactor
-	return time.Duration(sleep-sleepVar) + time.Duration(fastrand.Intn(int(2*sleepVar)))
+	variation := int(float64(s.staticSleepBetweenScans) * sleepVariationFactor)
+	upper := int(s.staticSleepBetweenScans) + variation
+	lower := int(s.staticSleepBetweenScans) - variation
+	rng := upper - lower
+	return time.Duration(fastrand.Intn(rng) + lower)
 }
 
 // deadline calculates how much we are willing to wait for a skylink to be fully
