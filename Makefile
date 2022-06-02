@@ -130,15 +130,15 @@ bench: fmt
 test:
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=. -count=$(count)
 
-# Having this in place keeps the "testing interface" of the service compatible with accounts, blocker and so on.
-test-long: lint lint-ci
-
-# All tests in this group rely on external services (such as MongoDB).
-test-int: test-long start-mongo
+# Tests in this group may rely on external services (such as MongoDB).
+test-long: lint lint-ci start-mongo
 	@mkdir -p cover
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=60s $(pkgs) -run=$(run) -count=$(count)
 	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -tags='testing debug netgo' -timeout=600s $(integration-pkgs) -run=$(run) -count=$(count)
 	-make stop-mongo
+
+# Having this in place keeps the "testing interface" of the service compatible with accounts, blocker and so on.
+test-int: test-long
 
 run-dev:
 	go run -tags="dev" .
