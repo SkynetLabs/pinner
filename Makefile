@@ -1,10 +1,10 @@
 # These variables get inserted into ./build/commit.go
-BUILD_TIME=$(shell date)
+BUILD_TIME=$(shell date -u)
 GIT_REVISION=$(shell git rev-parse --short HEAD)
 GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
 
-ldflags= -X github.com/SkynetLabs/pinner/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
--X "github.com/SkynetLabs/pinner/build.BuildTime=${BUILD_TIME}"
+ldflags= -X "github.com/skynetlabs/pinner/build.GitRevision=${GIT_DIRTY}${GIT_REVISION}" \
+-X "github.com/skynetlabs/pinner/build.BuildTime=${BUILD_TIME}"
 
 racevars= history_size=3 halt_on_error=1 atexit_sleep_ms=2000
 
@@ -15,10 +15,10 @@ all: release
 count = 1
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-pkgs = ./ ./api ./database ./skyd ./test ./test/workers
+pkgs = ./ ./api ./conf ./database ./skyd ./test ./workers
 
 # integration-pkgs defines the packages which contain integration tests
-integration-pkgs = ./test ./test/api ./test/database
+integration-pkgs = ./test ./test/api ./test/database ./test/workers
 
 # run determines which tests run when running any variation of 'make test'.
 run = .

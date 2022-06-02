@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/api"
+	"github.com/skynetlabs/pinner/build"
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/skyd"
@@ -51,6 +52,7 @@ func main() {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
 
+	logger.Printf("Starting Pinner service.\nGitRevision: %v (built %v)\n", build.GitRevision, build.BuildTime)
 	err = server.ListenAndServe(4000)
 	log.Fatal(errors.Compose(err, scanner.Close()))
 }
