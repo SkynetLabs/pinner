@@ -150,9 +150,9 @@ func (s *Scanner) threadedScanAndPin() {
 		}
 
 		s.staticLogger.Tracef("Start scanning.")
-		s.refreshDryRun()
-		s.refreshMinPinners()
-		s.pinUnderpinnedSkylinks()
+		s.managedRefreshDryRun()
+		s.managedRefreshMinPinners()
+		s.managedPinUnderpinnedSkylinks()
 		s.staticLogger.Tracef("End scanning.")
 
 		// Sleep between database scans.
@@ -165,10 +165,11 @@ func (s *Scanner) threadedScanAndPin() {
 	}
 }
 
-// pinUnderpinnedSkylinks loops over all underpinned skylinks and pins them.
-func (s *Scanner) pinUnderpinnedSkylinks() {
-	s.staticLogger.Trace("Entering pinUnderpinnedSkylinks.")
-	defer s.staticLogger.Trace("Exiting  pinUnderpinnedSkylinks.")
+// managedPinUnderpinnedSkylinks loops over all underpinned skylinks and pins
+// them.
+func (s *Scanner) managedPinUnderpinnedSkylinks() {
+	s.staticLogger.Trace("Entering managedPinUnderpinnedSkylinks.")
+	defer s.staticLogger.Trace("Exiting  managedPinUnderpinnedSkylinks.")
 	for {
 		// Check for service shutdown before talking to the DB.
 		select {
@@ -188,7 +189,7 @@ func (s *Scanner) pinUnderpinnedSkylinks() {
 		// is an error, then there is nothing to wait for.
 		if err == nil {
 			// Block until the pinned skylink becomes healthy or until a timeout.
-			s.waitUntilHealthy(skylink, sp)
+			s.managedWaitUntilHealthy(skylink, sp)
 			continue
 		}
 		// In case of error we still want to sleep for a moment in order to
@@ -297,9 +298,9 @@ func (s *Scanner) estimateTimeToFull(skylink skymodules.Skylink) time.Duration {
 	return time.Duration(secondsRemaining) * time.Second
 }
 
-// refreshDryRun makes sure the local value of dry_run matches the one
+// managedRefreshDryRun makes sure the local value of dry_run matches the one
 // in the database.
-func (s *Scanner) refreshDryRun() {
+func (s *Scanner) managedRefreshDryRun() {
 	dr, err := conf.DryRun(context.TODO(), s.staticDB)
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for dry_run"))
@@ -311,9 +312,9 @@ func (s *Scanner) refreshDryRun() {
 	s.mu.Unlock()
 }
 
-// refreshMinPinners makes sure the local value of min pinners matches the one
+// managedRefreshMinPinners makes sure the local value of min pinners matches the one
 // in the database.
-func (s *Scanner) refreshMinPinners() {
+func (s *Scanner) managedRefreshMinPinners() {
 	mp, err := conf.MinPinners(context.TODO(), s.staticDB)
 	if err != nil {
 		s.staticLogger.Warn(errors.AddContext(err, "failed to fetch the DB value for min_pinners"))
@@ -324,10 +325,12 @@ func (s *Scanner) refreshMinPinners() {
 	s.mu.Unlock()
 }
 
-// waitUntilHealthy blocks until the given skylinks becomes fully healthy or a
-// timeout occurs.
-func (s *Scanner) waitUntilHealthy(skylink skymodules.Skylink, sp skymodules.SiaPath) {
-	deadlineTimer := s.deadline(skylink)
+// managedWaitUntilHealthy blocks until the given skylinks becomes fully healthy
+// or a timeout occurs.
+//
+// The method is marked as managed because it performs long-running operations.
+func (s *Scanner) managedWaitUntilHealthy(skylink skymodules.Skylink, sp skymodules.SiaPath) {
+	deadlineTimer := s.staticDeadline(skylink)
 	defer deadlineTimer.Stop()
 	ticker := time.NewTicker(SleepBetweenHealthChecks)
 	defer ticker.Stop()
@@ -368,9 +371,9 @@ func (s *Scanner) SleepBetweenScans() time.Duration {
 	return time.Duration(fastrand.Intn(rng) + lower)
 }
 
-// deadline calculates how much we are willing to wait for a skylink to be fully
+// staticDeadline calculates how much we are willing to wait for a skylink to be fully
 // healthy before giving up. It's twice the expected time, as returned by
 // estimateTimeToFull.
-func (s *Scanner) deadline(skylink skymodules.Skylink) *time.Timer {
+func (s *Scanner) staticDeadline(skylink skymodules.Skylink) *time.Timer {
 	return time.NewTimer(2 * s.estimateTimeToFull(skylink))
 }
