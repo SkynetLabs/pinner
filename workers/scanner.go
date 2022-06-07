@@ -70,7 +70,7 @@ var (
 		// de-sync the scan and the sweeps.
 		Standard: 19 * time.Hour,
 		Dev:      1 * time.Minute,
-		Testing:  100 * time.Millisecond,
+		Testing:  300 * time.Millisecond,
 	}).(time.Duration)
 	// sleepVariationFactor defines how much the sleep between scans will
 	// vary between executions. It represents percent.
