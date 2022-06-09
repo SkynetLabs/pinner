@@ -78,8 +78,8 @@ func (c *client) DiffPinnedSkylinks(skylinks []string) (unknown []string, missin
 // FileHealth returns the health of the given sia file.
 // Perfect health is 0.
 func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
-	c.staticLogger.Trace("Entering FileHealth.")
-	defer c.staticLogger.Trace("Exiting  FileHealth.")
+	c.staticLogger.Trace("Entering FileHealth")
+	defer c.staticLogger.Trace("Exiting  FileHealth")
 	rf, err := c.staticClient.RenterFileRootGet(sp)
 	if err != nil {
 		return 0, err
@@ -89,8 +89,8 @@ func (c *client) FileHealth(sp skymodules.SiaPath) (float64, error) {
 
 // Metadata returns the metadata of the skylink
 func (c *client) Metadata(skylink string) (skymodules.SkyfileMetadata, error) {
-	c.staticLogger.Trace("Entering Metadata.")
-	defer c.staticLogger.Trace("Exiting  Metadata.")
+	c.staticLogger.Trace("Entering Metadata")
+	defer c.staticLogger.Trace("Exiting  Metadata")
 	_, meta, err := c.staticClient.SkynetMetadataGet(skylink)
 	if err != nil {
 		return skymodules.SkyfileMetadata{}, err
@@ -126,8 +126,8 @@ func (c *client) Pin(skylink string) (skymodules.SiaPath, error) {
 // on which the caller can either wait or select. The caller can check whether
 // the rebuild was successful by calling Error().
 func (c *client) RebuildCache() RebuildCacheResult {
-	c.staticLogger.Trace("Entering RebuildCache.")
-	defer c.staticLogger.Trace("Exiting  RebuildCache.")
+	c.staticLogger.Trace("Entering RebuildCache")
+	defer c.staticLogger.Trace("Exiting  RebuildCache")
 	return c.staticSkylinksCache.Rebuild(c)
 }
 

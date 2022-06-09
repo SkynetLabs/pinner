@@ -149,17 +149,17 @@ func (s *Scanner) threadedScanAndPin() {
 			}
 		}
 
-		s.staticLogger.Tracef("Start scanning.")
+		s.staticLogger.Tracef("Start scanning")
 		s.managedRefreshDryRun()
 		s.managedRefreshMinPinners()
 		s.managedPinUnderpinnedSkylinks()
-		s.staticLogger.Tracef("End scanning.")
+		s.staticLogger.Tracef("End scanning")
 
 		// Sleep between database scans.
 		select {
 		case <-time.After(s.SleepBetweenScans()):
 		case <-s.staticTG.StopChan():
-			s.staticLogger.Trace("Stopping scanner.")
+			s.staticLogger.Trace("Stopping scanner")
 			return
 		}
 	}
@@ -168,13 +168,13 @@ func (s *Scanner) threadedScanAndPin() {
 // managedPinUnderpinnedSkylinks loops over all underpinned skylinks and pins
 // them.
 func (s *Scanner) managedPinUnderpinnedSkylinks() {
-	s.staticLogger.Trace("Entering managedPinUnderpinnedSkylinks.")
-	defer s.staticLogger.Trace("Exiting  managedPinUnderpinnedSkylinks.")
+	s.staticLogger.Trace("Entering managedPinUnderpinnedSkylinks")
+	defer s.staticLogger.Trace("Exiting  managedPinUnderpinnedSkylinks")
 	for {
 		// Check for service shutdown before talking to the DB.
 		select {
 		case <-s.staticTG.StopChan():
-			s.staticLogger.Trace("Stop channel closed.")
+			s.staticLogger.Trace("Stop channel closed")
 			return
 		default:
 		}
@@ -199,7 +199,7 @@ func (s *Scanner) managedPinUnderpinnedSkylinks() {
 		// managedFindAndPinOneUnderpinnedSkylink.
 		select {
 		case <-s.staticTG.StopChan():
-			s.staticLogger.Trace("Stop channel closed.")
+			s.staticLogger.Trace("Stop channel closed")
 			return
 		case <-time.After(SleepBetweenPins):
 		}

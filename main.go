@@ -52,7 +52,8 @@ func main() {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}
 
-	logger.Printf("Starting Pinner service.\nGitRevision: %v (built %v)\n", build.GitRevision, build.BuildTime)
+	logger.Print("Starting Pinner service")
+	logger.Printf("GitRevision: %v (built %v)", build.GitRevision, build.BuildTime)
 	err = server.ListenAndServe(4000)
 	log.Fatal(errors.Compose(err, scanner.Close()))
 }
