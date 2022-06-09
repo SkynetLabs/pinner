@@ -20,6 +20,7 @@ import (
 const (
 	defaultAccountsHost = "10.10.10.70"
 	defaultAccountsPort = "3000"
+	defaultLogFile      = "/logs/pinner.log"
 	defaultLogLevel     = "info"
 	defaultSiaAPIHost   = "10.10.10.10"
 	defaultSiaAPIPort   = "9980"
@@ -64,6 +65,9 @@ type (
 		AccountsPort string
 		// DBCredentials holds all the information we need to connect to the DB.
 		DBCredentials database.DBCredentials
+		// Logfile defines the log file we want to write to. If it's empty we do
+		// not log to a file.
+		LogFile string
 		// LogLevel defines the logging level of the entire service.
 		LogLevel string
 		// MinPinners defines the minimum number of pinning servers
@@ -96,6 +100,7 @@ func LoadConfig() (Config, error) {
 		AccountsHost:  defaultAccountsHost,
 		AccountsPort:  defaultAccountsPort,
 		DBCredentials: database.DBCredentials{},
+		LogFile:       defaultLogFile,
 		LogLevel:      defaultLogLevel,
 		MinPinners:    defaultMinPinners,
 		SiaAPIHost:    defaultSiaAPIHost,
@@ -131,6 +136,9 @@ func LoadConfig() (Config, error) {
 	}
 	if val, ok = os.LookupEnv("SKYNET_ACCOUNTS_PORT"); ok {
 		cfg.AccountsPort = val
+	}
+	if val, ok = os.LookupEnv("PINNER_LOG_FILE"); ok {
+		cfg.LogFile = val
 	}
 	if val, ok = os.LookupEnv("PINNER_LOG_LEVEL"); ok {
 		cfg.LogLevel = val
