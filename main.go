@@ -60,13 +60,15 @@ func main() {
 }
 
 // newLogger creates a new logger that can write to disk.
+//
+// The function also returns a closer function that should be called when we
+// stop using the logger, typically deferred in main.
 func newLogger(level, logfile string) (logger *logrus.Logger, closer func(), err error) {
 	logger = logrus.New()
 	// Parse and set log level.
 	logLevel, err := logrus.ParseLevel(level)
 	if err != nil {
-		err = errors.AddContext(err, "invalid log level: "+level)
-		return
+		return nil, nil, errors.AddContext(err, "invalid log level: "+level)
 	}
 	logger.SetLevel(logLevel)
 	// Open and start writing to the log file, unless we have an empty string,
@@ -75,7 +77,7 @@ func newLogger(level, logfile string) (logger *logrus.Logger, closer func(), err
 		var fh *os.File
 		fh, err = os.OpenFile(logfile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
-			err = errors.AddContext(err, "failed to open log file")
+			return nil, nil, errors.AddContext(err, "failed to open log file")
 		}
 		logger.SetOutput(io.MultiWriter(os.Stdout, fh))
 		// Create a closer function which flushes the content to disk and closes
@@ -91,5 +93,5 @@ func newLogger(level, logfile string) (logger *logrus.Logger, closer func(), err
 			}
 		}
 	}
-	return
+	return logger, closer, nil
 }
