@@ -97,14 +97,15 @@ func LoadConfig() (Config, error) {
 
 	// Start with the default values.
 	cfg := Config{
-		AccountsHost:  defaultAccountsHost,
-		AccountsPort:  defaultAccountsPort,
-		DBCredentials: database.DBCredentials{},
-		LogFile:       defaultLogFile,
-		LogLevel:      defaultLogLevel,
-		MinPinners:    defaultMinPinners,
-		SiaAPIHost:    defaultSiaAPIHost,
-		SiaAPIPort:    defaultSiaAPIPort,
+		AccountsHost:      defaultAccountsHost,
+		AccountsPort:      defaultAccountsPort,
+		DBCredentials:     database.DBCredentials{},
+		LogFile:           defaultLogFile,
+		LogLevel:          defaultLogLevel,
+		MinPinners:        defaultMinPinners,
+		SiaAPIHost:        defaultSiaAPIHost,
+		SiaAPIPort:        defaultSiaAPIPort,
+		SleepBetweenScans: 0, // This will be ignored by the scanner.
 	}
 
 	var ok bool
