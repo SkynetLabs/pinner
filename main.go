@@ -27,11 +27,11 @@ func main() {
 	// the service. Once the context is closed, any background threads will
 	// wind themselves down.
 	ctx := context.Background()
-	logger, loggerCloser, err := newLogger(cfg.LogLevel, cfg.LogFile)
+	logger, closeLoggerFn, err := newLogger(cfg.LogLevel, cfg.LogFile)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to initialise logger"))
 	}
-	defer loggerCloser()
+	defer closeLoggerFn()
 
 	// Initialised the database connection.
 	db, err := database.New(ctx, cfg.DBCredentials, logger)
@@ -63,7 +63,7 @@ func main() {
 //
 // The function also returns a closer function that should be called when we
 // stop using the logger, typically deferred in main.
-func newLogger(level, logfile string) (logger *logrus.Logger, closer func(), err error) {
+func newLogger(level, logfile string) (logger *logrus.Logger, closerFn func(), err error) {
 	logger = logrus.New()
 	// Parse and set log level.
 	logLevel, err := logrus.ParseLevel(level)
@@ -80,18 +80,18 @@ func newLogger(level, logfile string) (logger *logrus.Logger, closer func(), err
 			return nil, nil, errors.AddContext(err, "failed to open log file")
 		}
 		logger.SetOutput(io.MultiWriter(os.Stdout, fh))
-		// Create a closer function which flushes the content to disk and closes
+		// Create a closerFn function which flushes the content to disk and closes
 		// the log file gracefully.
-		closer = func() {
+		closerFn = func() {
 			if e := fh.Sync(); e != nil {
-				log.Println(errors.AddContext(err, "failed to sync log file to disk"))
+				log.Println(errors.AddContext(e, "failed to sync log file to disk"))
 				return
 			}
 			if e := fh.Close(); e != nil {
-				log.Println(errors.AddContext(err, "failed to close log file"))
+				log.Println(errors.AddContext(e, "failed to close log file"))
 				return
 			}
 		}
 	}
-	return logger, closer, nil
+	return logger, closerFn, nil
 }
