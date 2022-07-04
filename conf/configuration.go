@@ -20,7 +20,7 @@ import (
 const (
 	defaultAccountsHost = "10.10.10.70"
 	defaultAccountsPort = "3000"
-	defaultLogFile      = "/logs/pinner.log"
+	defaultLogFile      = "" // disabled logging to file
 	defaultLogLevel     = "info"
 	defaultSiaAPIHost   = "10.10.10.10"
 	defaultSiaAPIPort   = "9980"
