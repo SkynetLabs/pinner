@@ -140,4 +140,4 @@ test-long: lint lint-ci start-mongo
 run-dev:
 	go run -tags="dev" .
 
-.PHONY: all fmt install release check test test-int test-long start-mongo stop-mongo run-dev
+.PHONY: all fmt install release check test test-long start-mongo stop-mongo run-dev
