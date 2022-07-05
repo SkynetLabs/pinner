@@ -13,14 +13,9 @@ import (
 //
 // The function also returns a closer function that should be called when we
 // stop using the logger, typically deferred in main.
-func NewLogger(level, logfile string) (logger *logrus.Logger, closer func(), err error) {
+func NewLogger(level logrus.Level, logfile string) (logger *logrus.Logger, closer func(), err error) {
 	logger = logrus.New()
-	// Parse and set log level.
-	logLevel, err := logrus.ParseLevel(level)
-	if err != nil {
-		return nil, nil, errors.AddContext(err, "invalid log level: "+level)
-	}
-	logger.SetLevel(logLevel)
+	logger.SetLevel(level)
 	// Open and start writing to the log file, unless we have an empty string,
 	// which signifies "don't log to disk".
 	if logfile != "" {

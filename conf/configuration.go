@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
@@ -21,7 +22,7 @@ const (
 	defaultAccountsHost = "10.10.10.70"
 	defaultAccountsPort = "3000"
 	defaultLogFile      = "" // disabled logging to file
-	defaultLogLevel     = "info"
+	defaultLogLevel     = logrus.InfoLevel
 	defaultSiaAPIHost   = "10.10.10.10"
 	defaultSiaAPIPort   = "9980"
 	defaultMinPinners   = 1
@@ -69,7 +70,7 @@ type (
 		// not log to a file.
 		LogFile string
 		// LogLevel defines the logging level of the entire service.
-		LogLevel string
+		LogLevel logrus.Level
 		// MinPinners defines the minimum number of pinning servers
 		// which a skylink needs in order to not be considered underpinned.
 		// Anything below this value requires more servers to pin the skylink.
@@ -142,7 +143,11 @@ func LoadConfig() (Config, error) {
 		cfg.LogFile = val
 	}
 	if val, ok = os.LookupEnv("PINNER_LOG_LEVEL"); ok {
-		cfg.LogLevel = val
+		lvl, err := logrus.ParseLevel(val)
+		if err != nil {
+			log.Fatalf("PINNER_LOG_LEVEL has an invalid value of '%s'", val)
+		}
+		cfg.LogLevel = lvl
 	}
 	if val, ok = os.LookupEnv("PINNER_SLEEP_BETWEEN_SCANS"); ok {
 		// Check for a bare number and interpret that as seconds.

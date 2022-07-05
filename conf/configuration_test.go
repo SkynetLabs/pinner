@@ -151,7 +151,7 @@ func TestLoadConfig(t *testing.T) {
 	if cfg.LogLevel != optionalValues["PINNER_LOG_LEVEL"] {
 		t.Fatal("Bad LogLevel")
 	}
-	if tm, e := time.ParseDuration(optionalValues["PINNER_SLEEP_BETWEEN_SCANS"]); e != nil || cfg.SleepBetweenScans != tm {
+	if tm, err := time.ParseDuration(optionalValues["PINNER_SLEEP_BETWEEN_SCANS"]); err != nil || cfg.SleepBetweenScans != tm {
 		t.Fatal("Bad SleepBetweenScans")
 	}
 	if cfg.SiaAPIHost != optionalValues["API_HOST"] {
