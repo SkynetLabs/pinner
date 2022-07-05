@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/conf"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/fastrand"
@@ -84,7 +84,7 @@ type (
 	// skyd.
 	Scanner struct {
 		staticDB                *database.DB
-		staticLogger            *logrus.Logger
+		staticLogger            logger.ExtFieldLogger
 		staticServerName        string
 		staticSkydClient        skyd.Client
 		staticSleepBetweenScans time.Duration
@@ -97,7 +97,7 @@ type (
 )
 
 // NewScanner creates a new Scanner instance.
-func NewScanner(db *database.DB, logger *logrus.Logger, minPinners int, serverName string, customSleepBetweenScans time.Duration, skydClient skyd.Client) *Scanner {
+func NewScanner(db *database.DB, logger logger.ExtFieldLogger, minPinners int, serverName string, customSleepBetweenScans time.Duration, skydClient skyd.Client) *Scanner {
 	sleep := sleepBetweenScans
 	if customSleepBetweenScans > 0 {
 		sleep = customSleepBetweenScans

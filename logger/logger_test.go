@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
 // TestNewLogger ensures the log file is created where it should be.
@@ -22,14 +24,14 @@ func TestNewLogger(t *testing.T) {
 		t.Fatal(err)
 	}
 	unwritableLog := unwritableDir + "/pinner.log"
-	_, _, err = NewLogger("trace", unwritableLog)
+	_, err = New(logrus.TraceLevel, unwritableLog)
 	if err == nil || !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("Expected 'permission denied', got '%s'", err)
 	}
 
 	// Initialise the logger with a writable log file.
 	writableLog := dir + "/pinner.log"
-	_, _, err = NewLogger("trace", writableLog)
+	_, err = New(logrus.TraceLevel, writableLog)
 	if err != nil {
 		t.Fatal(err)
 	}

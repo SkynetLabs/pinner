@@ -25,11 +25,11 @@ func main() {
 	// the service. Once the context is closed, any background threads will
 	// wind themselves down.
 	ctx := context.Background()
-	logger, closeLoggerFn, err := logger.NewLogger(cfg.LogLevel, cfg.LogFile)
+	logger, err := logger.New(cfg.LogLevel, cfg.LogFile)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to initialise logger"))
 	}
-	defer closeLoggerFn()
+	defer logger.Close()
 
 	// Initialised the database connection.
 	db, err := database.New(ctx, cfg.DBCredentials, logger)

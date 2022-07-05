@@ -148,7 +148,7 @@ func TestLoadConfig(t *testing.T) {
 	if cfg.LogFile != optionalValues["PINNER_LOG_FILE"] {
 		t.Fatal("Bad LogFile")
 	}
-	if cfg.LogLevel != optionalValues["PINNER_LOG_LEVEL"] {
+	if cfg.LogLevel.String() != optionalValues["PINNER_LOG_LEVEL"] {
 		t.Fatal("Bad LogLevel")
 	}
 	if tm, err := time.ParseDuration(optionalValues["PINNER_SLEEP_BETWEEN_SCANS"]); err != nil || cfg.SleepBetweenScans != tm {
