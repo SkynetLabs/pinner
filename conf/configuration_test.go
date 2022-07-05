@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"gitlab.com/NebulousLabs/fastrand"
 )
 
@@ -126,10 +127,16 @@ func TestLoadConfig(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// We'll set a special value for PINNER_SLEEP_BETWEEN_SCANS because it needs
-	// to be a valid duration string.
+	// We'll set a special value for PINNER_SLEEP_BETWEEN_SCANS and
+	// PINNER_LOG_LEVEL because they need to have valid values.
 	optionalValues["PINNER_SLEEP_BETWEEN_SCANS"] = time.Duration(fastrand.Intn(math.MaxInt)).String()
 	err = os.Setenv("PINNER_SLEEP_BETWEEN_SCANS", optionalValues["PINNER_SLEEP_BETWEEN_SCANS"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Random log level between 0 (Panic) and 7 (Trace).
+	optionalValues["PINNER_LOG_LEVEL"] = logrus.Level(fastrand.Intn(int(logrus.TraceLevel) + 1)).String()
+	err = os.Setenv("PINNER_LOG_LEVEL", optionalValues["PINNER_LOG_LEVEL"])
 	if err != nil {
 		t.Fatal(err)
 	}
