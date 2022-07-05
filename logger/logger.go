@@ -28,10 +28,6 @@ func NewLogger(level logrus.Level, logfile string) (logger *logrus.Logger, close
 		// Create a closer function which flushes the content to disk and closes
 		// the log file gracefully.
 		closer = func() {
-			if e := fh.Sync(); e != nil {
-				log.Println(errors.AddContext(err, "failed to sync log file to disk"))
-				return
-			}
 			if e := fh.Close(); e != nil {
 				log.Println(errors.AddContext(err, "failed to close log file"))
 				return
