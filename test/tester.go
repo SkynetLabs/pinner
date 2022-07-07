@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
 	"github.com/skynetlabs/pinner/sweeper"
 	"gitlab.com/NebulousLabs/errors"
@@ -37,7 +38,7 @@ type (
 		Ctx             context.Context
 		DB              *database.DB
 		FollowRedirects bool
-		Logger          *logrus.Logger
+		Logger          logger.ExtFieldLogger
 		ServerName      string
 		SkydClient      skyd.Client
 
