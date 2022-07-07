@@ -83,7 +83,10 @@ func (s *Sweeper) Scheduled() Schedule {
 
 // Status returns a copy of the status of the current sweep.
 func (s *Sweeper) Status() Status {
-	return s.status
+	s.statusMu.Lock()
+	st := s.status
+	s.statusMu.Unlock()
+	return st
 }
 
 // Sweep starts a new skyd sweep, unless one is already underway.
