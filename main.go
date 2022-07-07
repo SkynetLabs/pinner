@@ -29,7 +29,11 @@ func main() {
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to initialise logger"))
 	}
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			log.Println(errors.AddContext(err, "failed to close logger"))
+		}
+	}()
 
 	// Initialised the database connection.
 	db, err := database.New(ctx, cfg.DBCredentials, logger)
