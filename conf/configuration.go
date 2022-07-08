@@ -216,7 +216,7 @@ func MinPinners(ctx context.Context, db *database.DB) (int, error) {
 
 // NextScan returns the time of the next cluster-wide scan for underpinned files.
 func NextScan(ctx context.Context, db *database.DB, logger logger.ExtFieldLogger) (time.Time, error) {
-	val, err := db.ConfigValue(ctx, ConfMinPinners)
+	val, err := db.ConfigValue(ctx, ConfNextScan)
 	if errors.Contains(err, mongo.ErrNoDocuments) {
 		logger.Infof("Missing database value for '%s', setting a new one.", ConfNextScan)
 		// No scan has been scheduled. Schedule one in an hour.
