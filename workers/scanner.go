@@ -72,6 +72,14 @@ var (
 		Dev:      1 * time.Minute,
 		Testing:  300 * time.Millisecond,
 	}).(time.Duration)
+	// sleepBetweenChecksForScan defines how often we'll scan the DB for
+	// the next scheduled scan. Changing this values will affect the values in
+	// conf.NextScan.
+	sleepBetweenChecksForScan = build.Select(build.Var{
+		Standard: 30 * time.Minute,
+		Dev:      30 * time.Second,
+		Testing:  100 * time.Millisecond,
+	}).(time.Duration)
 	// sleepVariationFactor defines how much the sleep between scans will
 	// vary between executions. It represents percent.
 	sleepVariationFactor = 0.1
@@ -138,6 +146,28 @@ func (s *Scanner) threadedScanAndPin() {
 
 	// Main execution loop, goes on forever while the service is running.
 	for {
+		// Check if it's time for a scan:
+
+		// Wait for the next scan.
+		t, err := conf.NextScan(context.Background(), s.staticDB, s.staticLogger)
+		// On error, we'll sleep for half an hour and we'll try again.
+		if err != nil {
+			s.staticLogger.Debug(errors.AddContext(err, "failed to fetch next scan time"))
+			time.Sleep(sleepBetweenChecksForScan)
+			continue
+		}
+		// If there is more than half an hour until the next scan, we'll sleep
+		// for half an hour and we'll check again. It's possible for the
+		// schedule to change meanwhile.
+		if t.UTC().After(time.Now().UTC().Add(sleepBetweenChecksForScan)) {
+			time.Sleep(sleepBetweenChecksForScan)
+			continue
+		}
+		// Sleep until the scan time and then perform a scan.
+		time.Sleep(time.Now().UTC().Sub(t.UTC()))
+
+		// Perform a scan:
+
 		// Rebuild the cache and watch for service shutdown while doing that.
 		res := s.staticSkydClient.RebuildCache()
 		select {
@@ -155,9 +185,30 @@ func (s *Scanner) threadedScanAndPin() {
 		s.managedPinUnderpinnedSkylinks()
 		s.staticLogger.Tracef("End scanning")
 
-		// Sleep between database scans.
+		// Schedule the next scan, unless already scheduled:
+
+		t, err = conf.NextScan(context.Background(), s.staticDB, s.staticLogger)
+		if err != nil {
+			s.staticLogger.Debug(errors.AddContext(err, "failed to fetch next scan time"))
+			time.Sleep(sleepBetweenChecksForScan)
+			continue
+		}
+		// Schedule the next scan time if the scheduled time is in the past.
+		if t.UTC().Before(time.Now().UTC()) {
+			// Set the next scan to be after sleepBetweenScans.
+			err = conf.SetNextScan(context.Background(), s.staticDB, time.Now().UTC().Add(sleepBetweenScans))
+			if err != nil {
+				// Log the error and sleep for half an hour. Meanwhile, another
+				// server will finish its scan and will set the next scan time.
+				s.staticLogger.Debug(errors.AddContext(err, "failed to set next scan time"))
+				time.Sleep(sleepBetweenChecksForScan)
+				continue
+			}
+		}
+
+		// Sleep until it's time to check for the next scan.
 		select {
-		case <-time.After(s.SleepBetweenScans()):
+		case <-time.After(sleepBetweenChecksForScan):
 		case <-s.staticTG.StopChan():
 			s.staticLogger.Trace("Stopping scanner")
 			return

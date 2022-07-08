@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/logger"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -40,6 +41,9 @@ const (
 	// ConfMinPinners holds the name of the configuration setting which defines
 	// the minimum number of pinners we want to ensure for each skyfile.
 	ConfMinPinners = "min_pinners"
+	// ConfNextScan holds the name of the configuration setting which controls
+	// when the next cluster-wide scan for underpinned skylinks will happen.
+	ConfNextScan = "next_scan"
 )
 
 const (
@@ -208,4 +212,40 @@ func MinPinners(ctx context.Context, db *database.DB) (int, error) {
 		return 0, errors.New(errMsg)
 	}
 	return int(mp), nil
+}
+
+// NextScan returns the time of the next cluster-wide scan for underpinned files.
+func NextScan(ctx context.Context, db *database.DB, logger logger.ExtFieldLogger) (time.Time, error) {
+	val, err := db.ConfigValue(ctx, ConfNextScan)
+	if errors.Contains(err, mongo.ErrNoDocuments) {
+		logger.Infof("Missing database value for '%s', setting a new one.", ConfNextScan)
+		// No scan has been scheduled. Schedule one in an hour.
+		err = SetNextScan(ctx, db, time.Now().Add(time.Hour).UTC())
+		if err != nil {
+			return time.Time{}, err
+		}
+		// Read the value from the DB in order to avoid race conditions.
+		// While this does not eliminate data races, it does help.
+		return NextScan(ctx, db, logger)
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	t, err := time.Parse(time.RFC3339, val)
+	if err != nil {
+		logger.Warnf("Invalid database value for '%s': '%s', setting a new one.", ConfNextScan, val)
+		err = SetNextScan(ctx, db, time.Now().Add(time.Hour).UTC())
+		if err != nil {
+			return time.Time{}, err
+		}
+		// Read the value from the DB in order to avoid race conditions.
+		// While this does not eliminate data races, it does help.
+		return NextScan(ctx, db, logger)
+	}
+	return t, nil
+}
+
+// SetNextScan sets the time of the next cluster-wide scan for underpinned files.
+func SetNextScan(ctx context.Context, db *database.DB, t time.Time) error {
+	return db.SetConfigValue(ctx, ConfNextScan, t.UTC().Format(time.RFC3339))
 }

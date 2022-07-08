@@ -15,10 +15,7 @@ all: release
 count = 1
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
-pkgs = ./ ./api ./conf ./database ./logger ./skyd ./test ./workers
-
-# integration-pkgs defines the packages which contain integration tests
-integration-pkgs = ./test ./test/api ./test/database
+pkgs = ./ ./api ./conf ./database ./logger ./skyd ./test ./test/api ./test/database ./workers
 
 # run determines which tests run when running any variation of 'make test'.
 run = .
@@ -130,14 +127,13 @@ bench: fmt
 test:
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=. -count=$(count)
 
-# Tests in this group may rely on external services (such as MongoDB).
-test-long: lint lint-ci start-mongo
+test-long: lint lint-ci start-mongo test-long-ci stop-mongo
+
+test-long-ci:
 	@mkdir -p cover
-	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=60s $(pkgs) -run=$(run) -count=$(count)
-	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -tags='testing debug netgo' -timeout=600s $(integration-pkgs) -run=$(run) -count=$(count)
-	-make stop-mongo
+	GORACE='$(racevars)' go test -race --coverprofile='./cover/cover.out' -v -tags='testing debug netgo' -timeout=300s $(pkgs) -run=$(run) -count=$(count)
 
 run-dev:
 	go run -tags="dev" .
 
-.PHONY: all fmt install release check test test-long start-mongo stop-mongo run-dev
+.PHONY: all fmt install release check bench test test-long test-long-ci start-mongo stop-mongo run-dev
