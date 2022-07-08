@@ -50,7 +50,7 @@ func main() {
 	}
 	swpr := sweeper.New(db, skydClient, cfg.ServerName)
 	// Schedule a sweep every 24 hours.
-	swpr.Schedule(24 * time.Hour)
+	swpr.UpdateSchedule(24 * time.Hour)
 
 	// Initialise the server.
 	server, err := api.New(cfg.ServerName, db, logger, skydClient, swpr)

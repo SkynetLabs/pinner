@@ -15,7 +15,7 @@ import (
 type (
 	// Schedule defines how often, if at all, we sweep this server automatically.
 	Schedule struct {
-		Period   time.Duration
+		period   time.Duration
 		cancelCh chan struct{}
 	}
 	// Status represents the status of a sweep.
@@ -49,19 +49,19 @@ func New(db *database.DB, skydc skyd.Client, serverName string) *Sweeper {
 	}
 }
 
-// Schedule a scan to run on each period.
-func (s *Sweeper) Schedule(period time.Duration) {
+// UpdateSchedule schedules a scan to run on each period.
+func (s *Sweeper) UpdateSchedule(period time.Duration) {
 	s.scheduleMu.Lock()
 	defer s.scheduleMu.Unlock()
 	if s.schedule != nil {
 		close(s.schedule.cancelCh)
 	}
 	s.schedule = &Schedule{
-		Period:   period,
+		period:   period,
 		cancelCh: make(chan struct{}),
 	}
 	go func() {
-		t := time.NewTicker(s.schedule.Period)
+		t := time.NewTicker(s.schedule.period)
 		for {
 			select {
 			case <-t.C:
@@ -71,14 +71,6 @@ func (s *Sweeper) Schedule(period time.Duration) {
 			}
 		}
 	}()
-}
-
-// Scheduled returns a copy of the current Sweeper schedule.
-func (s *Sweeper) Scheduled() Schedule {
-	if s.schedule == nil {
-		return Schedule{}
-	}
-	return *s.schedule
 }
 
 // Status returns a copy of the status of the current sweep.
