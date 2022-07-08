@@ -11,11 +11,6 @@ import (
 )
 
 type (
-	// Schedule defines how often, if at all, we sweep this server automatically.
-	Schedule struct {
-		period   time.Duration
-		cancelCh chan struct{}
-	}
 	// Status represents the status of a sweep.
 	Status struct {
 		InProgress bool
@@ -27,11 +22,9 @@ type (
 	// and marks them as pinned by the local server.
 	Sweeper struct {
 		staticDB         *database.DB
-		staticSkydClient skyd.Client
+		staticSchedule   *Schedule
 		staticServerName string
-
-		schedule   *Schedule
-		scheduleMu sync.Mutex
+		staticSkydClient skyd.Client
 
 		status   Status
 		statusMu sync.Mutex
@@ -44,31 +37,13 @@ func New(db *database.DB, skydc skyd.Client, serverName string) *Sweeper {
 		staticDB:         db,
 		staticSkydClient: skydc,
 		staticServerName: serverName,
+		staticSchedule:   &Schedule{},
 	}
 }
 
-// UpdateSchedule schedules a scan to run on each period.
-func (s *Sweeper) UpdateSchedule(period time.Duration) {
-	s.scheduleMu.Lock()
-	defer s.scheduleMu.Unlock()
-	if s.schedule != nil {
-		close(s.schedule.cancelCh)
-	}
-	s.schedule = &Schedule{
-		period:   period,
-		cancelCh: make(chan struct{}),
-	}
-	go func() {
-		t := time.NewTicker(s.schedule.period)
-		for {
-			select {
-			case <-t.C:
-				s.Sweep()
-			case <-s.schedule.cancelCh:
-				return
-			}
-		}
-	}()
+// Schedule returns the sweeper's schedule.
+func (s *Sweeper) Schedule() *Schedule {
+	return s.staticSchedule
 }
 
 // Status returns a copy of the status of the current sweep.
