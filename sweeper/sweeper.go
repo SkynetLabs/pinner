@@ -22,7 +22,7 @@ type (
 	// and marks them as pinned by the local server.
 	Sweeper struct {
 		staticDB         *database.DB
-		staticSchedule   *Schedule
+		staticSchedule   *schedule
 		staticServerName string
 		staticSkydClient skyd.Client
 
@@ -37,13 +37,8 @@ func New(db *database.DB, skydc skyd.Client, serverName string) *Sweeper {
 		staticDB:         db,
 		staticSkydClient: skydc,
 		staticServerName: serverName,
-		staticSchedule:   &Schedule{},
+		staticSchedule:   &schedule{},
 	}
-}
-
-// Schedule returns the sweeper's schedule.
-func (s *Sweeper) Schedule() *Schedule {
-	return s.staticSchedule
 }
 
 // Status returns a copy of the status of the current sweep.
@@ -63,6 +58,13 @@ func (s *Sweeper) Status() Status {
 //  implementations is sufficient for that.
 func (s *Sweeper) Sweep() {
 	go s.threadedPerformSweep()
+}
+
+// UpdateSchedule schedules a new series of sweeps to be run.
+// If there are already scheduled sweeps, that schedule is cancelled (running
+// // sweeps are not interrupted) and a new schedule is established.
+func (s *Sweeper) UpdateSchedule(period time.Duration) {
+	s.staticSchedule.Update(period, s)
 }
 
 // threadedPerformSweep performs the actual sweep operation.

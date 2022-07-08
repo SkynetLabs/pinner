@@ -6,8 +6,8 @@ import (
 )
 
 type (
-	// Schedule defines how often, if at all, we sweep this server automatically.
-	Schedule struct {
+	// schedule defines how often, if at all, we sweep this server automatically.
+	schedule struct {
 		period   time.Duration
 		cancelCh chan struct{}
 		mu       sync.Mutex
@@ -15,9 +15,9 @@ type (
 )
 
 // Update schedules a new series of sweeps to be run, using the given Sweeper.
-// If there are already scheduled sweeps, that staticSchedule is cancelled (running
-// sweeps are not interrupted) and a new staticSchedule is established.
-func (s *Schedule) Update(period time.Duration, sweeper *Sweeper) {
+// If there are already scheduled sweeps, that schedule is cancelled (running
+// sweeps are not interrupted) and a new schedule is established.
+func (s *schedule) Update(period time.Duration, sweeper *Sweeper) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
