@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/logger"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/node/api"
 	skydclient "gitlab.com/SkynetLabs/skyd/node/api/client"
@@ -48,13 +48,13 @@ type (
 	// client allows us to call the local skyd instance.
 	client struct {
 		staticClient        *skydclient.Client
-		staticLogger        *logrus.Logger
+		staticLogger        logger.ExtFieldLogger
 		staticSkylinksCache *PinnedSkylinksCache
 	}
 )
 
 // NewClient creates a new skyd client.
-func NewClient(host, port, password string, cache *PinnedSkylinksCache, logger *logrus.Logger) Client {
+func NewClient(host, port, password string, cache *PinnedSkylinksCache, logger logger.ExtFieldLogger) Client {
 	opts := skydclient.Options{
 		Address:       fmt.Sprintf("%s:%s", host, port),
 		Password:      password,
