@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/skynetlabs/pinner/logger"
 	"gitlab.com/NebulousLabs/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -41,7 +41,7 @@ type (
 	DB struct {
 		staticCtx    context.Context
 		staticDB     *mongo.Database
-		staticLogger *logrus.Logger
+		staticLogger logger.ExtFieldLogger
 	}
 
 	// DBCredentials is a helper struct that binds together all values needed for
@@ -55,12 +55,12 @@ type (
 )
 
 // New creates a new database connection.
-func New(ctx context.Context, creds DBCredentials, logger *logrus.Logger) (*DB, error) {
+func New(ctx context.Context, creds DBCredentials, logger logger.ExtFieldLogger) (*DB, error) {
 	return NewCustomDB(ctx, dbName, creds, logger)
 }
 
 // NewCustomDB creates a new database connection to a database with a custom name.
-func NewCustomDB(ctx context.Context, dbName string, creds DBCredentials, logger *logrus.Logger) (*DB, error) {
+func NewCustomDB(ctx context.Context, dbName string, creds DBCredentials, logger logger.ExtFieldLogger) (*DB, error) {
 	if ctx == nil {
 		return nil, errors.New("invalid context provided")
 	}
@@ -144,7 +144,7 @@ func (db *DB) SetConfigValue(ctx context.Context, key, value string) error {
 // creates them if needed.
 // See https://docs.mongodb.com/manual/indexes/
 // See https://docs.mongodb.com/manual/core/index-unique/
-func ensureDBSchema(ctx context.Context, db *mongo.Database, log *logrus.Logger) error {
+func ensureDBSchema(ctx context.Context, db *mongo.Database, log logger.ExtFieldLogger) error {
 	for collName, models := range schema() {
 		coll, err := ensureCollection(ctx, db, collName)
 		if err != nil {

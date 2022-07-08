@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/sirupsen/logrus"
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
@@ -20,7 +20,7 @@ type (
 	API struct {
 		staticServerName string
 		staticDB         *database.DB
-		staticLogger     *logrus.Logger
+		staticLogger     logger.ExtFieldLogger
 		staticRouter     *httprouter.Router
 		staticSkydClient skyd.Client
 
@@ -43,7 +43,7 @@ type (
 )
 
 // New returns a new initialised API.
-func New(serverName string, db *database.DB, logger *logrus.Logger, skydClient skyd.Client) (*API, error) {
+func New(serverName string, db *database.DB, logger logger.ExtFieldLogger, skydClient skyd.Client) (*API, error) {
 	if db == nil {
 		return nil, errors.New("no DB provided")
 	}
