@@ -60,7 +60,7 @@ func (api *API) pinPOST(w http.ResponseWriter, req *http.Request, _ httprouter.P
 	// If the skylink already exists, add this server to its list of servers and
 	// mark the skylink as pinned.
 	if errors.Contains(err, database.ErrSkylinkExists) {
-		err = api.staticDB.AddServerForSkylink(req.Context(), sl, api.staticServerName, true)
+		err = api.staticDB.AddServerForSkylinks(req.Context(), []string{sl.String()}, api.staticServerName, true)
 	}
 	if err != nil {
 		api.WriteError(w, err, http.StatusInternalServerError)

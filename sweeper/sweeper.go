@@ -8,8 +8,6 @@ import (
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/SkynetLabs/skyd/build"
-	"gitlab.com/SkynetLabs/skyd/skymodules"
 )
 
 type (
@@ -150,34 +148,16 @@ func (s *Sweeper) threadedPerformSweep() {
 	}
 
 	unknown, missing := s.staticSkydClient.DiffPinnedSkylinks(dbSkylinks)
-
-	// Remove all unknown skylink from the database.
-	var skylink skymodules.Skylink
-	for _, sl := range unknown {
-		skylink, err = database.SkylinkFromString(sl)
-		if err != nil {
-			err = errors.AddContext(err, "invalid skylink found in DB")
-			build.Critical(err)
-			continue
-		}
-		err = s.staticDB.RemoveServerFromSkylink(ctx, skylink, s.staticServerName)
-		if err != nil {
-			err = errors.AddContext(err, "failed to unpin skylink")
-			return
-		}
+	// Remove all unknown skylinks from the database.
+	err = s.staticDB.RemoveServerFromSkylinks(ctx, unknown, s.staticServerName)
+	if err != nil {
+		err = errors.AddContext(err, "failed to remove server for skylink")
+		return
 	}
 	// Add all missing skylinks to the database.
-	for _, sl := range missing {
-		skylink, err = database.SkylinkFromString(sl)
-		if err != nil {
-			err = errors.AddContext(err, "invalid skylink reported by skyd")
-			build.Critical(err)
-			continue
-		}
-		err = s.staticDB.AddServerForSkylink(ctx, skylink, s.staticServerName, false)
-		if err != nil {
-			err = errors.AddContext(err, "failed to unpin skylink")
-			return
-		}
+	err = s.staticDB.AddServerForSkylinks(ctx, missing, s.staticServerName, false)
+	if err != nil {
+		err = errors.AddContext(err, "failed to add server for skylink")
+		return
 	}
 }

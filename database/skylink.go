@@ -113,20 +113,20 @@ func (db *DB) MarkUnpinned(ctx context.Context, skylink skymodules.Skylink) erro
 	return err
 }
 
-// AddServerForSkylink adds a new server to the list of servers known to be pinning
-// this skylink. If the skylink does not already exist in the database it will
-// be inserted. This operation is idempotent.
+// AddServerForSkylinks adds a new server to the list of servers known to be
+// pinning these skylinks. If a skylink does not already exist in the database
+// it will be inserted. This operation is idempotent.
 //
-// The `markPinned` flag sets the `unpin` field of the skylink to false when
+// The `markPinned` flag sets the `unpin` field of a skylink to false when
 // raised but it doesn't set it to false when not raised. The reason for that is
 // that it accommodates a specific use case - adding a server to the list of
 // pinners of a given skylink will set the unpin field to false is we are doing
 // that because we know that a user is pinning it but not so if we are running
 // a server sweep and documenting which skylinks are pinned by this server.
-func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylink, server string, markPinned bool) error {
-	db.staticLogger.Tracef("Entering AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Tracef("Exiting  AddServerForSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	filter := bson.M{"skylink": skylink.String()}
+func (db *DB) AddServerForSkylinks(ctx context.Context, skylinks []string, server string, markPinned bool) error {
+	db.staticLogger.Tracef("Entering AddServerForSkylinks. Skylink: '%v', server: '%s'", skylinks, server)
+	defer db.staticLogger.Tracef("Exiting  AddServerForSkylinks. Skylink: '%v', server: '%s'", skylinks, server)
+	filter := bson.M{"skylink": bson.M{"$in": skylinks}}
 	var update bson.M
 	if markPinned {
 		update = bson.M{
@@ -137,22 +137,22 @@ func (db *DB) AddServerForSkylink(ctx context.Context, skylink skymodules.Skylin
 		update = bson.M{"$addToSet": bson.M{"servers": server}}
 	}
 	opts := options.Update().SetUpsert(true)
-	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update, opts)
+	_, err := db.staticDB.Collection(collSkylinks).UpdateMany(ctx, filter, update, opts)
 	return err
 }
 
-// RemoveServerFromSkylink removes a server to the list of servers known to be
-// pinning this skylink. If the skylink does not exist in the database it will
-// not be inserted.
-func (db *DB) RemoveServerFromSkylink(ctx context.Context, skylink skymodules.Skylink, server string) error {
-	db.staticLogger.Tracef("Entering RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
-	defer db.staticLogger.Tracef("Exiting  RemoveServerFromSkylink. Skylink: '%s', server: '%s'", skylink, server)
+// RemoveServerFromSkylinks removes a server from the list of servers known to
+// be pinning these skylinks. If a skylink does not exist in the database it
+// will not be inserted.
+func (db *DB) RemoveServerFromSkylinks(ctx context.Context, skylinks []string, server string) error {
+	db.staticLogger.Tracef("Entering RemoveServerFromSkylinks. Skylink: '%v', server: '%s'", skylinks, server)
+	defer db.staticLogger.Tracef("Exiting  RemoveServerFromSkylinks. Skylink: '%v', server: '%s'", skylinks, server)
 	filter := bson.M{
-		"skylink": skylink.String(),
+		"skylink": bson.M{"$in": skylinks},
 		"servers": server,
 	}
 	update := bson.M{"$pull": bson.M{"servers": server}}
-	_, err := db.staticDB.Collection(collSkylinks).UpdateOne(ctx, filter, update)
+	_, err := db.staticDB.Collection(collSkylinks).UpdateMany(ctx, filter, update)
 	return err
 }
 
