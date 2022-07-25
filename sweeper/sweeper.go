@@ -6,8 +6,14 @@ import (
 	"time"
 
 	"github.com/skynetlabs/pinner/database"
+	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
 	"gitlab.com/NebulousLabs/errors"
+)
+
+const (
+	// SweepInterval determines how often we perform our regular sweeps.
+	SweepInterval = 24 * time.Hour
 )
 
 type (
@@ -21,12 +27,14 @@ type (
 	// status is the internal type we use when we want to be able to modify it.
 	status struct {
 		Status
-		mu sync.Mutex
+		mu           sync.Mutex
+		staticLogger *logger.Logger
 	}
 	// Sweeper takes care of sweeping the files pinned by the local skyd server
 	// and marks them as pinned by the local server.
 	Sweeper struct {
 		staticDB         *database.DB
+		staticLogger     *logger.Logger
 		staticSchedule   *schedule
 		staticServerName string
 		staticSkydClient skyd.Client
@@ -35,13 +43,16 @@ type (
 )
 
 // New returns a new Sweeper.
-func New(db *database.DB, skydc skyd.Client, serverName string) *Sweeper {
+func New(db *database.DB, skydc skyd.Client, serverName string, logger *logger.Logger) *Sweeper {
 	return &Sweeper{
 		staticDB:         db,
+		staticLogger:     logger,
 		staticSchedule:   &schedule{},
 		staticServerName: serverName,
 		staticSkydClient: skydc,
-		staticStatus:     &status{},
+		staticStatus: &status{
+			staticLogger: logger,
+		},
 	}
 }
 
@@ -58,7 +69,7 @@ func (s *Sweeper) Sweep() {
 
 // UpdateSchedule schedules a new series of sweeps to be run.
 // If there are already scheduled sweeps, that schedule is cancelled (running
-// // sweeps are not interrupted) and a new schedule is established.
+// sweeps are not interrupted) and a new schedule is established.
 func (s *Sweeper) UpdateSchedule(period time.Duration) {
 	s.staticSchedule.Update(period, s)
 }
@@ -66,13 +77,20 @@ func (s *Sweeper) UpdateSchedule(period time.Duration) {
 // threadedPerformSweep performs the actual sweep operation.
 func (s *Sweeper) threadedPerformSweep() {
 	if s.staticStatus.InProgress {
+		s.staticLogger.Debug("Attempted to start a sweep while another one was already ongoing.")
 		return
 	}
+	// Mark a sweep as started.
 	s.staticStatus.Start()
 	// Define an error variable which will represent the success of the scan.
 	var err error
 	// Ensure that we'll finalize the sweep on returning from this method.
-	defer s.staticStatus.Finalize(err)
+	defer func() {
+		if err != nil {
+			s.staticLogger.Debug(errors.AddContext(err, "sweeping failed with error"))
+		}
+		s.staticStatus.Finalize(err)
+	}()
 
 	// Perform the actual sweep.
 	// Kick off a skyd client cache rebuild. That happens in a separate
@@ -122,6 +140,7 @@ func (st *status) Start() {
 	// Double-check for parallel sweeps.
 	if st.InProgress {
 		st.mu.Unlock()
+		st.staticLogger.Debug("Attempted to start a sweep while another one was already ongoing.")
 		return
 	}
 	// Initialise the status to "a sweep is running".
@@ -130,6 +149,7 @@ func (st *status) Start() {
 	st.StartTime = time.Now().UTC()
 	st.EndTime = time.Time{}
 	st.mu.Unlock()
+	st.staticLogger.Info("Started a sweep.")
 }
 
 // Finalize marks a run as completed with the given error.
@@ -139,4 +159,5 @@ func (st *status) Finalize(err error) {
 	st.EndTime = time.Now().UTC()
 	st.Error = err
 	st.mu.Unlock()
+	st.staticLogger.Info("Finalized a sweep.")
 }

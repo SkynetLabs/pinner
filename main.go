@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/skynetlabs/pinner/api"
 	"github.com/skynetlabs/pinner/build"
@@ -50,9 +49,9 @@ func main() {
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to start Scanner"))
 	}
-	swpr := sweeper.New(db, skydClient, cfg.ServerName)
-	// Schedule a sweep every 24 hours.
-	swpr.UpdateSchedule(24 * time.Hour)
+	swpr := sweeper.New(db, skydClient, cfg.ServerName, logger)
+	// Schedule a regular sweep..
+	swpr.UpdateSchedule(sweeper.SweepInterval)
 
 	// Initialise the server.
 	server, err := api.New(cfg.ServerName, db, logger, skydClient, swpr)
