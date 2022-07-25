@@ -18,6 +18,11 @@ type (
 		StartTime  time.Time
 		EndTime    time.Time
 	}
+	// status is the internal type we use when we want to be able to modify it.
+	status struct {
+		Status
+		mu sync.Mutex
+	}
 	// Sweeper takes care of sweeping the files pinned by the local skyd server
 	// and marks them as pinned by the local server.
 	Sweeper struct {
@@ -25,9 +30,7 @@ type (
 		staticSchedule   *schedule
 		staticServerName string
 		staticSkydClient skyd.Client
-
-		status   Status
-		statusMu sync.Mutex
+		staticStatus     *status
 	}
 )
 
@@ -35,27 +38,20 @@ type (
 func New(db *database.DB, skydc skyd.Client, serverName string) *Sweeper {
 	return &Sweeper{
 		staticDB:         db,
-		staticSkydClient: skydc,
-		staticServerName: serverName,
 		staticSchedule:   &schedule{},
+		staticServerName: serverName,
+		staticSkydClient: skydc,
+		staticStatus:     &status{},
 	}
 }
 
 // Status returns a copy of the status of the current sweep.
 func (s *Sweeper) Status() Status {
-	s.statusMu.Lock()
-	st := s.status
-	s.statusMu.Unlock()
+	st := (*s.staticStatus).Status
 	return st
 }
 
 // Sweep starts a new skyd sweep, unless one is already underway.
-//
-// TODO If we want to be able to uniquely identify sweeps we can issue ids
-//  for them and keep their statuses in a map. This would be the appropriate
-//  RESTful approach. I am not sure we need that because all we care about
-//  is to be able to kick off one and wait for it to end and this
-//  implementations is sufficient for that.
 func (s *Sweeper) Sweep() {
 	go s.threadedPerformSweep()
 }
@@ -69,44 +65,23 @@ func (s *Sweeper) UpdateSchedule(period time.Duration) {
 
 // threadedPerformSweep performs the actual sweep operation.
 func (s *Sweeper) threadedPerformSweep() {
-	s.statusMu.Lock()
-	// Double-check for parallel sweeps.
-	if s.status.InProgress {
-		s.statusMu.Unlock()
+	if s.staticStatus.InProgress {
 		return
 	}
-	// Initialise the status to "a sweep is running".
-	s.status = Status{
-		InProgress: true,
-		Error:      nil,
-		StartTime:  time.Now().UTC(),
-		EndTime:    time.Time{},
-	}
-	s.statusMu.Unlock()
+	s.staticStatus.Start()
 	// Define an error variable which will represent the success of the scan.
 	var err error
 	// Ensure that we'll finalize the sweep on returning from this method.
-	defer func() {
-		s.statusMu.Lock()
-		s.status.InProgress = false
-		s.status.EndTime = time.Now().UTC()
-		s.status.Error = err
-		s.statusMu.Unlock()
-	}()
+	defer s.staticStatus.Finalize(err)
 
 	// Perform the actual sweep.
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var cacheErr error
-	go func() {
-		defer wg.Done()
-		res := s.staticSkydClient.RebuildCache()
-		<-res.ErrAvail
-		cacheErr = res.ExternErr
-	}()
+	// Kick off a skyd client cache rebuild. That happens in a separate
+	// goroutine. We'll block on the result channel only after we're done with
+	// the other tasks we can do while waiting.
+	res := s.staticSkydClient.RebuildCache()
 
 	// We use an independent context because we are not strictly bound to a
-	// specific API call. Also, this operation can take significant amount of
+	// specific API call. Also, this operation can take a significant amount of
 	// time and we don't want it to fail because of a timeout.
 	ctx := context.Background()
 	dbCtx, cancel := context.WithDeadline(ctx, time.Now().UTC().Add(database.MongoDefaultTimeout))
@@ -118,9 +93,10 @@ func (s *Sweeper) threadedPerformSweep() {
 		err = errors.AddContext(err, "failed to fetch skylinks for server")
 		return
 	}
-	wg.Wait()
-	if cacheErr != nil {
-		err = errors.AddContext(cacheErr, "failed to rebuild skyd cache")
+	// Block until the cache rebuild is done.
+	<-res.ErrAvail
+	if res.ExternErr != nil {
+		err = errors.AddContext(res.ExternErr, "failed to rebuild skyd cache")
 		return
 	}
 
@@ -137,4 +113,30 @@ func (s *Sweeper) threadedPerformSweep() {
 		err = errors.AddContext(err, "failed to add server for skylink")
 		return
 	}
+}
+
+// Start marks the start of a new process, unless one is already in progress.
+// If there is a process in progress then Start returns without any action.
+func (st *status) Start() {
+	st.mu.Lock()
+	// Double-check for parallel sweeps.
+	if st.InProgress {
+		st.mu.Unlock()
+		return
+	}
+	// Initialise the status to "a sweep is running".
+	st.InProgress = true
+	st.Error = nil
+	st.StartTime = time.Now().UTC()
+	st.EndTime = time.Time{}
+	st.mu.Unlock()
+}
+
+// Finalize marks a run as completed with the given error.
+func (st *status) Finalize(err error) {
+	st.mu.Lock()
+	st.InProgress = false
+	st.EndTime = time.Now().UTC()
+	st.Error = err
+	st.mu.Unlock()
 }
