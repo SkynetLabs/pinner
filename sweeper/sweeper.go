@@ -28,13 +28,13 @@ type (
 	status struct {
 		Status
 		mu           sync.Mutex
-		staticLogger *logger.Logger
+		staticLogger logger.ExtFieldLogger
 	}
 	// Sweeper takes care of sweeping the files pinned by the local skyd server
 	// and marks them as pinned by the local server.
 	Sweeper struct {
 		staticDB         *database.DB
-		staticLogger     *logger.Logger
+		staticLogger     logger.ExtFieldLogger
 		staticSchedule   *schedule
 		staticServerName string
 		staticSkydClient skyd.Client
@@ -43,7 +43,7 @@ type (
 )
 
 // New returns a new Sweeper.
-func New(db *database.DB, skydc skyd.Client, serverName string, logger *logger.Logger) *Sweeper {
+func New(db *database.DB, skydc skyd.Client, serverName string, logger logger.ExtFieldLogger) *Sweeper {
 	return &Sweeper{
 		staticDB:         db,
 		staticLogger:     logger,
@@ -58,7 +58,9 @@ func New(db *database.DB, skydc skyd.Client, serverName string, logger *logger.L
 
 // Status returns a copy of the status of the current sweep.
 func (s *Sweeper) Status() Status {
-	st := (*s.staticStatus).Status
+	s.staticStatus.mu.Lock()
+	st := s.staticStatus.Status
+	s.staticStatus.mu.Unlock()
 	return st
 }
 
@@ -76,10 +78,6 @@ func (s *Sweeper) UpdateSchedule(period time.Duration) {
 
 // threadedPerformSweep performs the actual sweep operation.
 func (s *Sweeper) threadedPerformSweep() {
-	if s.staticStatus.InProgress {
-		s.staticLogger.Debug("Attempted to start a sweep while another one was already ongoing.")
-		return
-	}
 	// Mark a sweep as started.
 	s.staticStatus.Start()
 	// Define an error variable which will represent the success of the scan.

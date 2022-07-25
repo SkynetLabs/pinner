@@ -70,7 +70,7 @@ func NewTester(dbName string) (*Tester, error) {
 
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	skydClientMock := skyd.NewSkydClientMock()
-	swpr := sweeper.New(db, skydClientMock, cfg.ServerName)
+	swpr := sweeper.New(db, skydClientMock, cfg.ServerName, logger)
 	// The server API encapsulates all the modules together.
 	server, err := api.New(cfg.ServerName, db, logger, skydClientMock, swpr)
 	if err != nil {
