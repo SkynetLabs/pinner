@@ -17,8 +17,8 @@ import (
 // * FindSkylink
 // * MarkPinned
 // * MarkUnpinned
-// * AddServerForSkylink
-// * RemoveServerFromSkylink
+// * AddServerForSkylinks
+// * RemoveServerFromSkylinks
 func TestSkylink(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -36,114 +36,148 @@ func TestSkylink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sl := test.RandomSkylink()
+	sl1 := test.RandomSkylink()
+	sl2 := test.RandomSkylink()
 
-	// Fetch the skylink from the DB. Expect ErrSkylinkNotExist.
-	_, err = db.FindSkylink(ctx, sl)
+	// Fetch the skylinks from the DB. Expect ErrSkylinkNotExist.
+	_, err = db.FindSkylink(ctx, sl1)
 	if !errors.Contains(err, database.ErrSkylinkNotExist) {
 		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNotExist, err)
 	}
-	// Create the skylink.
-	s, err := db.CreateSkylink(ctx, sl, cfg.ServerName)
+	_, err = db.FindSkylink(ctx, sl2)
+	if !errors.Contains(err, database.ErrSkylinkNotExist) {
+		t.Fatalf("Expected error %v, got %v.", database.ErrSkylinkNotExist, err)
+	}
+	// Create the skylinks.
+	s1, err := db.CreateSkylink(ctx, sl1, cfg.ServerName)
+	if err != nil {
+		t.Fatal("Failed to create a skylink:", err)
+	}
+	s2, err := db.CreateSkylink(ctx, sl2, cfg.ServerName)
 	if err != nil {
 		t.Fatal("Failed to create a skylink:", err)
 	}
 	// Validate that the underlying skylink is the same.
-	if s.Skylink != sl.String() {
-		t.Fatalf("Expected skylink '%s', got '%s'", sl, s.Skylink)
+	if s1.Skylink != sl1.String() {
+		t.Fatalf("Expected skylink '%s', got '%s'", sl1, s1.Skylink)
+	}
+	if s2.Skylink != sl2.String() {
+		t.Fatalf("Expected skylink '%s', got '%s'", sl2, s2.Skylink)
 	}
 	// Add the skylink again, expect this to fail with ErrSkylinkExists.
 	otherServer := "second create"
-	_, err = db.CreateSkylink(ctx, sl, otherServer)
+	_, err = db.CreateSkylink(ctx, sl1, otherServer)
 	if !errors.Contains(err, database.ErrSkylinkExists) {
 		t.Fatalf("Expected '%v', got '%v'", database.ErrSkylinkExists, err)
 	}
 	// Clean up.
-	err = db.RemoveServerFromSkylink(ctx, sl, otherServer)
+	err = db.RemoveServerFromSkylinks(ctx, []string{sl1.String(), sl2.String()}, otherServer)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Ensure that they're gone.
+	s1, err = db.FindSkylink(ctx, sl1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if test.Contains(s1.Servers, otherServer) {
+		t.Fatalf("Did not expect to have %s there", otherServer)
+	}
+	s2, err = db.FindSkylink(ctx, sl2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if test.Contains(s2.Servers, otherServer) {
+		t.Fatalf("Did not expect to have %s there", otherServer)
 	}
 
 	// Add a new server to the list.
 	server := "new server"
-	err = db.AddServerForSkylink(ctx, sl, server, false)
+	err = db.AddServerForSkylinks(ctx, []string{sl1.String(), sl2.String()}, server, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = db.FindSkylink(ctx, sl)
+	s1, err = db.FindSkylink(ctx, sl1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err = db.FindSkylink(ctx, sl2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Make sure the new server was added to the list.
-	if s.Servers[0] != server && s.Servers[1] != server {
-		t.Fatalf("Expected to find '%s' in the list, got '%v'", server, s.Servers)
+	if !test.Contains(s1.Servers, server) {
+		t.Fatalf("Expected to find '%s' in the list, got '%v'", server, s1.Servers)
+	}
+	if !test.Contains(s2.Servers, server) {
+		t.Fatalf("Expected to find '%s' in the list, got '%v'", server, s2.Servers)
 	}
 	// Remove a server from the list.
-	err = db.RemoveServerFromSkylink(ctx, sl, server)
+	err = db.RemoveServerFromSkylinks(ctx, []string{sl1.String(), sl2.String()}, server)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = db.FindSkylink(ctx, sl)
+	s1, err = db.FindSkylink(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Make sure the new server was added to the list.
-	if len(s.Servers) != 1 || s.Servers[0] != cfg.ServerName {
-		t.Fatalf("Expected to find only '%s' in the list, got '%v'", cfg.ServerName, s.Servers)
+	if len(s1.Servers) != 1 || s1.Servers[0] != cfg.ServerName {
+		t.Fatalf("Expected to find only '%s' in the list, got '%v'", cfg.ServerName, s1.Servers)
 	}
 	// Mark the file as unpinned.
-	err = db.MarkUnpinned(ctx, sl)
+	err = db.MarkUnpinned(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = db.FindSkylink(ctx, sl)
+	s1, err = db.FindSkylink(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Pinned {
+	if s1.Pinned {
 		t.Fatal("Expected the skylink to be unpinned.")
 	}
 	// Mark the file as pinned again.
-	err = db.MarkPinned(ctx, sl)
+	err = db.MarkPinned(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = db.FindSkylink(ctx, sl)
+	s1, err = db.FindSkylink(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.Pinned {
+	if !s1.Pinned {
 		t.Fatal("Expected the skylink to be pinned.")
 	}
 	// Mark the skylink as unpinned again.
-	err = db.MarkUnpinned(ctx, sl)
+	err = db.MarkUnpinned(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Add a server to it with the `markUnpinned` set to false.
 	// Expect the skylink to remain unpinned.
-	err = db.AddServerForSkylink(ctx, sl, "new server pin false", false)
+	err = db.AddServerForSkylinks(ctx, []string{sl1.String()}, "new server pin false", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = db.FindSkylink(ctx, sl)
+	s1, err = db.FindSkylink(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Pinned {
+	if s1.Pinned {
 		t.Fatal("Expected the skylink to be unpinned.")
 	}
 	// Add a server to the skylink with `markUnpinned` set to true.
 	// Expect the skylink to be pinned.
-	err = db.AddServerForSkylink(ctx, sl, "new server pin true", true)
+	err = db.AddServerForSkylinks(ctx, []string{sl1.String()}, "new server pin true", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = db.FindSkylink(ctx, sl)
+	s1, err = db.FindSkylink(ctx, sl1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.Pinned {
+	if !s1.Pinned {
 		t.Fatal("Expected the skylink to be pinned.")
 	}
 }
@@ -188,7 +222,7 @@ func TestFindAndLock(t *testing.T) {
 		t.Fatalf("Expected to get '%v', got '%v'", database.ErrNoUnderpinnedSkylinks, err)
 	}
 	// Make sure it's pinned by fewer than the minimum number of servers.
-	err = db.RemoveServerFromSkylink(ctx, sl, cfg.ServerName)
+	err = db.RemoveServerFromSkylinks(ctx, []string{sl.String()}, cfg.ServerName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +242,7 @@ func TestFindAndLock(t *testing.T) {
 		t.Fatalf("Expected to get '%v', got '%v'", database.ErrNoUnderpinnedSkylinks, err)
 	}
 	// Add a pinner.
-	err = db.AddServerForSkylink(ctx, sl, cfg.ServerName, false)
+	err = db.AddServerForSkylinks(ctx, []string{sl.String()}, cfg.ServerName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +276,7 @@ func TestFindAndLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Add a pinner.
-	err = db.AddServerForSkylink(ctx, sl, anotherServerName, false)
+	err = db.AddServerForSkylinks(ctx, []string{sl.String()}, anotherServerName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +340,7 @@ func TestFindAndLockOwnFirst(t *testing.T) {
 	// Add this server to the list of pinners, so we're sure that it's not being
 	// randomly selected. This will ensure that the same skylink is being
 	// returned because it's locked by the current server.
-	err = db.AddServerForSkylink(ctx, locked, cfg.ServerName, false)
+	err = db.AddServerForSkylinks(ctx, []string{locked.String()}, cfg.ServerName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +420,7 @@ func TestSkylinksForServer(t *testing.T) {
 		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
 	}
 	// Add a second server to sl1 and expect it to still show up on the list.
-	err = db.AddServerForSkylink(ctx, sl1, srv2, false)
+	err = db.AddServerForSkylinks(ctx, []string{sl1.String()}, srv2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,11 +432,7 @@ func TestSkylinksForServer(t *testing.T) {
 		t.Fatalf("Expected a list containing both %s and %s but got %+v", sl1.String(), sl2.String(), ls)
 	}
 	// Remove srv1 as pinner for both sl1 and sl2.
-	err = db.RemoveServerFromSkylink(ctx, sl1, srv1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = db.RemoveServerFromSkylink(ctx, sl2, srv1)
+	err = db.RemoveServerFromSkylinks(ctx, []string{sl1.String(), sl2.String()}, srv1)
 	if err != nil {
 		t.Fatal(err)
 	}

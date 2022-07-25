@@ -10,6 +10,7 @@ import (
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
+	"github.com/skynetlabs/pinner/sweeper"
 	"github.com/skynetlabs/pinner/workers"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -48,9 +49,12 @@ func main() {
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to start Scanner"))
 	}
+	swpr := sweeper.New(db, skydClient, cfg.ServerName, logger)
+	// Schedule a regular sweep..
+	swpr.UpdateSchedule(sweeper.SweepInterval)
 
 	// Initialise the server.
-	server, err := api.New(cfg.ServerName, db, logger, skydClient)
+	server, err := api.New(cfg.ServerName, db, logger, skydClient, swpr)
 	if err != nil {
 		log.Fatal(errors.AddContext(err, "failed to build the api"))
 	}

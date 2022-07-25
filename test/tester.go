@@ -15,6 +15,7 @@ import (
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
+	"github.com/skynetlabs/pinner/sweeper"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
 )
@@ -69,8 +70,9 @@ func NewTester(dbName string) (*Tester, error) {
 
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	skydClientMock := skyd.NewSkydClientMock()
+	swpr := sweeper.New(db, skydClientMock, cfg.ServerName, logger)
 	// The server API encapsulates all the modules together.
-	server, err := api.New(cfg.ServerName, db, logger, skydClientMock)
+	server, err := api.New(cfg.ServerName, db, logger, skydClientMock, swpr)
 	if err != nil {
 		cancel()
 		return nil, errors.AddContext(err, "failed to build the API")
@@ -296,8 +298,8 @@ func (t *Tester) SweepPOST() (api.SweepPOSTResponse, int, error) {
 }
 
 // SweepStatusGET returns the status of the latest sweep.
-func (t *Tester) SweepStatusGET() (api.SweepStatus, int, error) {
-	var resp api.SweepStatus
+func (t *Tester) SweepStatusGET() (sweeper.Status, int, error) {
+	var resp sweeper.Status
 	r, err := t.Request(http.MethodGet, "/sweep/status", nil, nil, nil, &resp)
 	return resp, r.StatusCode, err
 }

@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/skynetlabs/pinner/database"
 	"github.com/skynetlabs/pinner/logger"
 	"github.com/skynetlabs/pinner/skyd"
+	"github.com/skynetlabs/pinner/sweeper"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/SkynetLabs/skyd/build"
 )
@@ -23,17 +22,7 @@ type (
 		staticLogger     logger.ExtFieldLogger
 		staticRouter     *httprouter.Router
 		staticSkydClient skyd.Client
-
-		latestSweepStatus   SweepStatus
-		latestSweepStatusMu sync.Mutex
-	}
-
-	// SweepStatus represents the status of a sweep.
-	SweepStatus struct {
-		InProgress bool
-		Error      error
-		StartTime  time.Time
-		EndTime    time.Time
+		staticSweeper    *sweeper.Sweeper
 	}
 
 	// errorWrap is a helper type for converting an `error` struct to JSON.
@@ -43,7 +32,7 @@ type (
 )
 
 // New returns a new initialised API.
-func New(serverName string, db *database.DB, logger logger.ExtFieldLogger, skydClient skyd.Client) (*API, error) {
+func New(serverName string, db *database.DB, logger logger.ExtFieldLogger, skydClient skyd.Client, sweeper *sweeper.Sweeper) (*API, error) {
 	if db == nil {
 		return nil, errors.New("no DB provided")
 	}
@@ -59,6 +48,7 @@ func New(serverName string, db *database.DB, logger logger.ExtFieldLogger, skydC
 		staticLogger:     logger,
 		staticRouter:     router,
 		staticSkydClient: skydClient,
+		staticSweeper:    sweeper,
 	}
 	apiInstance.buildHTTPRoutes()
 	return apiInstance, nil
